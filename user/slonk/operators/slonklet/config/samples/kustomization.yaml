@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- slonk_v1_physicalnode.yaml
+- slonk_v1_slurmjob.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

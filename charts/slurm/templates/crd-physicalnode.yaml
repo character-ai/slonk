@@ -1,0 +1,388 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: physicalnodes.slonk.your-org.com
+spec:
+  group: slonk.your-org.com
+  names:
+    kind: PhysicalNode
+    listKind: PhysicalNodeList
+    plural: physicalnodes
+    singular: physicalnode
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: PhysicalNode is the Schema for the physicalnodes API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          eventRecords:
+            items:
+              description: EventRecord is a record of an event that's processed or
+                emitted by the controller.
+              properties:
+                acktimestamp:
+                  description: Timestamp when the event was acknowledged.
+                  format: date-time
+                  type: string
+                event:
+                  description: Event is a report of an event somewhere in the cluster.  Events
+                    have a limited retention time and triggers and messages may evolve
+                    with time.  Event consumers should not rely on the timing of an
+                    event with a given Reason reflecting a consistent underlying trigger,
+                    or the continued existence of events with that Reason.  Events
+                    should be treated as informative, best-effort, supplemental data.
+                  properties:
+                    action:
+                      description: What action was taken/failed regarding to the Regarding
+                        object.
+                      type: string
+                    apiVersion:
+                      description: 'APIVersion defines the versioned schema of this
+                        representation of an object. Servers should convert recognized
+                        schemas to the latest internal value, and may reject unrecognized
+                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                      type: string
+                    count:
+                      description: The number of times this event has occurred.
+                      format: int32
+                      type: integer
+                    eventTime:
+                      description: Time when this Event was first observed.
+                      format: date-time
+                      type: string
+                    firstTimestamp:
+                      description: The time at which the event was first recorded.
+                        (Time of server receipt is in TypeMeta.)
+                      format: date-time
+                      type: string
+                    involvedObject:
+                      description: The object that this event is about.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: 'If referring to a piece of an object instead
+                            of an entire object, this string should contain a valid
+                            JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container
+                            within a pod, this would take on a value like: "spec.containers{name}"
+                            (where "name" refers to the name of the container that
+                            triggered the event) or if no container name is specified
+                            "spec.containers[2]" (container with index 2 in this pod).
+                            This syntax is chosen only to have some well-defined way
+                            of referencing a part of an object. TODO: this design
+                            is not final and this field is subject to change in the
+                            future.'
+                          type: string
+                        kind:
+                          description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          type: string
+                        namespace:
+                          description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                          type: string
+                        resourceVersion:
+                          description: 'Specific resourceVersion to which this reference
+                            is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                          type: string
+                        uid:
+                          description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    kind:
+                      description: 'Kind is a string value representing the REST resource
+                        this object represents. Servers may infer this from the endpoint
+                        the client submits requests to. Cannot be updated. In CamelCase.
+                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                      type: string
+                    lastTimestamp:
+                      description: The time at which the most recent occurrence of
+                        this event was recorded.
+                      format: date-time
+                      type: string
+                    message:
+                      description: 'A human-readable description of the status of
+                        this operation. TODO: decide on maximum length.'
+                      type: string
+                    metadata:
+                      description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+                      type: object
+                    reason:
+                      description: 'This should be a short, machine understandable
+                        string that gives the reason for the transition into the object''s
+                        current status. TODO: provide exact specification for format.'
+                      type: string
+                    related:
+                      description: Optional secondary object for more complex actions.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: 'If referring to a piece of an object instead
+                            of an entire object, this string should contain a valid
+                            JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container
+                            within a pod, this would take on a value like: "spec.containers{name}"
+                            (where "name" refers to the name of the container that
+                            triggered the event) or if no container name is specified
+                            "spec.containers[2]" (container with index 2 in this pod).
+                            This syntax is chosen only to have some well-defined way
+                            of referencing a part of an object. TODO: this design
+                            is not final and this field is subject to change in the
+                            future.'
+                          type: string
+                        kind:
+                          description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          type: string
+                        namespace:
+                          description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                          type: string
+                        resourceVersion:
+                          description: 'Specific resourceVersion to which this reference
+                            is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                          type: string
+                        uid:
+                          description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    reportingComponent:
+                      description: Name of the controller that emitted this Event,
+                        e.g. `kubernetes.io/kubelet`.
+                      type: string
+                    reportingInstance:
+                      description: ID of the controller instance, e.g. `kubelet-xyzf`.
+                      type: string
+                    series:
+                      description: Data about the Event series this event represents
+                        or nil if it's a singleton Event.
+                      properties:
+                        count:
+                          description: Number of occurrences in this series up to
+                            the last heartbeat time
+                          format: int32
+                          type: integer
+                        lastObservedTime:
+                          description: Time of the last occurrence observed
+                          format: date-time
+                          type: string
+                      type: object
+                    source:
+                      description: The component reporting this event. Should be a
+                        short machine understandable string.
+                      properties:
+                        component:
+                          description: Component from which the event is generated.
+                          type: string
+                        host:
+                          description: Node name on which the event is generated.
+                          type: string
+                      type: object
+                    type:
+                      description: Type of this event (Normal, Warning), new types
+                        could be added in the future
+                      type: string
+                  required:
+                  - involvedObject
+                  - metadata
+                  type: object
+              type: object
+            type: array
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PhysicalNodeSpec defines the desired state of PhysicalNode
+            properties:
+              k8sNodeSpec:
+                properties:
+                  goalState:
+                    type: string
+                  reason:
+                    type: string
+                  timestamp:
+                    format: date-time
+                    type: string
+                required:
+                - goalState
+                type: object
+              manual:
+                type: boolean
+              slurmNodeSpec:
+                description: 'Desired state of cluster. Important: Run "make" to regenerate
+                  code after modifying this files'
+                properties:
+                  goalState:
+                    type: string
+                  reason:
+                    type: string
+                  timestamp:
+                    format: date-time
+                    type: string
+                required:
+                - goalState
+                type: object
+            required:
+            - k8sNodeSpec
+            - slurmNodeSpec
+            type: object
+          status:
+            description: PhysicalNodeStatus defines the observed state of PhysicalNode
+            properties:
+              k8sNodeStatus:
+                properties:
+                  name:
+                    type: string
+                  removed:
+                    type: boolean
+                  taints:
+                    items:
+                      description: The node this Taint is attached to has the "effect"
+                        on any pod that does not tolerate the Taint.
+                      properties:
+                        effect:
+                          description: Required. The effect of the taint on pods that
+                            do not tolerate the taint. Valid effects are NoSchedule,
+                            PreferNoSchedule and NoExecute.
+                          type: string
+                        key:
+                          description: Required. The taint key to be applied to a
+                            node.
+                          type: string
+                        timeAdded:
+                          description: TimeAdded represents the time at which the
+                            taint was added. It is only written for NoExecute taints.
+                          format: date-time
+                          type: string
+                        value:
+                          description: The taint value corresponding to the taint
+                            key.
+                          type: string
+                      required:
+                      - effect
+                      - key
+                      type: object
+                    type: array
+                  timestamp:
+                    format: date-time
+                    type: string
+                  unschedulable:
+                    type: boolean
+                type: object
+              k8sNodeStatusHistory:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    removed:
+                      type: boolean
+                    taints:
+                      items:
+                        description: The node this Taint is attached to has the "effect"
+                          on any pod that does not tolerate the Taint.
+                        properties:
+                          effect:
+                            description: Required. The effect of the taint on pods
+                              that do not tolerate the taint. Valid effects are NoSchedule,
+                              PreferNoSchedule and NoExecute.
+                            type: string
+                          key:
+                            description: Required. The taint key to be applied to
+                              a node.
+                            type: string
+                          timeAdded:
+                            description: TimeAdded represents the time at which the
+                              taint was added. It is only written for NoExecute taints.
+                            format: date-time
+                            type: string
+                          value:
+                            description: The taint value corresponding to the taint
+                              key.
+                            type: string
+                        required:
+                        - effect
+                        - key
+                        type: object
+                      type: array
+                    timestamp:
+                      format: date-time
+                      type: string
+                    unschedulable:
+                      type: boolean
+                  type: object
+                type: array
+              slurmNodeStatus:
+                description: 'Observed state of cluster. Important: Run "make" to
+                  regenerate code after modifying this file'
+                properties:
+                  comment:
+                    type: string
+                  features:
+                    items:
+                      type: string
+                    type: array
+                  name:
+                    type: string
+                  reason:
+                    type: string
+                  removed:
+                    type: boolean
+                  state:
+                    items:
+                      type: string
+                    type: array
+                  timestamp:
+                    format: date-time
+                    type: string
+                type: object
+              slurmNodeStatusHistory:
+                items:
+                  properties:
+                    comment:
+                      type: string
+                    features:
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      type: string
+                    reason:
+                      type: string
+                    removed:
+                      type: boolean
+                    state:
+                      items:
+                        type: string
+                      type: array
+                    timestamp:
+                      format: date-time
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

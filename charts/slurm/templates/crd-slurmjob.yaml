@@ -1,0 +1,139 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: slurmjobs.slonk.your-org.com
+spec:
+  group: slonk.your-org.com
+  names:
+    kind: SlurmJob
+    listKind: SlurmJobList
+    plural: slurmjobs
+    singular: slurmjob
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: SlurmJob is the Schema for the slurmjobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SlurmJobSpec defines the desired state of SlurmJob
+            properties:
+              command:
+                type: string
+              comment:
+                type: string
+              userName:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file'
+                type: string
+            type: object
+          status:
+            description: SlurmJobStatus defines the observed state of SlurmJob
+            properties:
+              restartCount:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file'
+                type: integer
+              slurmJobRunCurrentStatus:
+                properties:
+                  lastSyncTimestamp:
+                    format: date-time
+                    type: string
+                  physicalNodeSnapshots:
+                    additionalProperties:
+                      properties:
+                        accumulatedRuntime:
+                          description: Accumulated runtime of the job on this physical
+                            node across runs.
+                          type: string
+                        k8sNodeName:
+                          type: string
+                        physicalNodeName:
+                          type: string
+                        slurmNodeName:
+                          type: string
+                      type: object
+                    type: object
+                  priority:
+                    type: integer
+                  removed:
+                    description: Used to determine if the job has been removed from
+                      the slurm cluster. In this case it's hard to determine the end
+                      state, so use a separate field.
+                    type: boolean
+                  runID:
+                    description: Incremented after each restart.
+                    type: integer
+                  startTimestamp:
+                    format: date-time
+                    type: string
+                  state:
+                    type: string
+                  submitTimestamp:
+                    format: date-time
+                    type: string
+                type: object
+              slurmJobRunStatusHistory:
+                items:
+                  properties:
+                    lastSyncTimestamp:
+                      format: date-time
+                      type: string
+                    physicalNodeSnapshots:
+                      additionalProperties:
+                        properties:
+                          accumulatedRuntime:
+                            description: Accumulated runtime of the job on this physical
+                              node across runs.
+                            type: string
+                          k8sNodeName:
+                            type: string
+                          physicalNodeName:
+                            type: string
+                          slurmNodeName:
+                            type: string
+                        type: object
+                      type: object
+                    priority:
+                      type: integer
+                    removed:
+                      description: Used to determine if the job has been removed from
+                        the slurm cluster. In this case it's hard to determine the
+                        end state, so use a separate field.
+                      type: boolean
+                    runID:
+                      description: Incremented after each restart.
+                      type: integer
+                    startTimestamp:
+                      format: date-time
+                      type: string
+                    state:
+                      type: string
+                    submitTimestamp:
+                      format: date-time
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

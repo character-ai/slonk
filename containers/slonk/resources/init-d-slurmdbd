@@ -1,0 +1,66 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          slurmdbd
+# Required-Start:    $remote_fs $syslog munge
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start daemon at boot time
+# Description:       SlurmDB daemon
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+PIDFILE=/var/run/slurmdbd.pid
+SLURMDBD_OPTIONS=$(grep SLURMDBD_OPTIONS /etc/sysconfig/slurmdbd | cut -d'=' -f2-)
+
+start() {
+    log_daemon_msg "Starting slurmdbd" "slurmdbd"
+    if [ -f /etc/slurm/slurmdbd.conf ]; then
+        eval start-stop-daemon --start --quiet --pidfile $PIDFILE --exec /usr/sbin/slurmdbd -- $SLURMDBD_OPTIONS
+        log_end_msg $?
+    else
+        log_failure_msg "/etc/slurm/slurmdbd.conf not found"
+    fi
+}
+
+stop() {
+    log_daemon_msg "Stopping slurm controller daemon" "slurmdbd"
+    start-stop-daemon --stop --quiet --pidfile $PIDFILE --retry TERM/30/KILL/5
+    log_end_msg $?
+}
+
+status() {
+    if [ -f $PIDFILE ]; then
+        pid=$(cat $PIDFILE)
+        if kill -0 $pid > /dev/null 2>&1; then
+            echo "slurmdbd is running with pid $pid"
+        else
+            echo "slurmdbd is not running"
+        fi
+    else
+        echo "slurmdbd is not running"
+    fi
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Usage: /etc/init.d/slurmdbd {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

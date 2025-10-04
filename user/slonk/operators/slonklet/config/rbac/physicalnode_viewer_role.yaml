@@ -1,0 +1,27 @@
+# permissions for end users to view physicalnodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: physicalnode-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: slonklet
+    app.kubernetes.io/part-of: slonklet
+    app.kubernetes.io/managed-by: kustomize
+  name: physicalnode-viewer-role
+rules:
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - physicalnodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - physicalnodes/status
+  verbs:
+  - get

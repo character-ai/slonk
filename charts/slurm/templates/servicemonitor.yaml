@@ -1,0 +1,36 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: slurm-controller-svc-monitor
+spec:
+  selector:
+    matchLabels:
+      slurm_role: controller
+  endpoints:
+  - port: metrics
+    path: "/metrics"
+    interval: 15s
+    metricRelabelings:
+    - action: labeldrop
+      regex: (container|instance)
+    # https://github.com/operator-framework/operator-sdk/issues/4764#issuecomment-820344706
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: slurm-metrics-monitor
+  labels:
+    app: slurm-metrics
+spec:
+  selector:
+    matchLabels:
+      slurm-compute: "yes"
+  podMetricsEndpoints:
+  - port: metrics-port
+    interval: 15s
+    path: /metrics

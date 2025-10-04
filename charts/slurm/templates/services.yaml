@@ -1,0 +1,90 @@
+# combine .Values.nodepools with the generated TPU nodepool configs
+# MUST STAY IN SYNC WITH nodepools.yaml
+{{- $clusterName := .Values.clusterName }}
+{{- $nodepools := deepCopy .Values.nodepools }}
+
+{{- $tpuNodepools := include "slurm.tpuNodepools" (dict "configs" .Values.tpuConfigs "namespace" .Values.namespace "template" .Values.tpuCommonNodeTemplate) }}
+{{- $tpuNodepools2 := (get ($tpuNodepools | fromYaml) "output") }}
+{{- if $tpuNodepools2 }}
+{{- $nodepools = merge $nodepools $tpuNodepools2 }}
+{{- end }}
+
+{{- $gscNodepools := include "slurm.gscNodepools" (dict "configs" .Values.gscConfigs "namespace" .Values.namespace "template" .Values.gscCommonNodeTemplate) }}
+{{- $gscNodepools2 := (get ($gscNodepools | fromYaml) "output") }}
+{{- if $gscNodepools2 }}
+{{- $nodepools = merge $nodepools $gscNodepools2 }}
+{{- end }}
+
+# deploy services for each pod in each statefulset
+{{- range $name, $config := $nodepools }}
+{{- $name := printf "%s-%s" $clusterName $name }}
+{{- range until (int $config.replicas) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-{{ . }}
+spec:
+  clusterIP: None
+  selector:
+    statefulset.kubernetes.io/pod-name: "{{ $name }}-{{ . }}"
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slurm-controller
+  labels:
+    slurm_role: controller
+spec:
+  selector:
+    app: {{ .Values.clusterName}}-controller
+  ports:
+  - name: ssh
+    protocol: TCP
+    port: 22
+    targetPort: 22
+  - name: ssh2
+    protocol: TCP
+    port: 2022
+    targetPort: 2022
+  - name: metrics
+    protocol: TCP
+    port: 8071
+    targetPort: 8071
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slurm-login
+spec:
+  clusterIP: {{ .Values.loginClusterIP }}
+  selector:
+    app: {{ .Values.clusterName}}-login
+  ports:
+  - name: ssh
+    protocol: TCP
+    port: 22
+    targetPort: 22
+  - name: et
+    protocol: TCP
+    port: 2022
+    targetPort: 2022
+  - name: mosh
+    protocol: UDP
+    port: 60001
+    targetPort: 60001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slonklet-api
+spec:
+  selector:
+    app: {{ .Values.clusterName}}-controller
+  ports:
+  - name: api
+    protocol: TCP
+    port: 18080
+    targetPort: 18080

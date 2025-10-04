@@ -1,0 +1,40 @@
+{{- if not .Values.filestore.hostPath }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.filestore.pvNameToCreate }}
+spec:
+  storageClassName: {{ .Values.filestore.storageClass | toYaml }}
+  capacity:
+    storage: {{ .Values.filestore.size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  {{- if .Values.filestore.csi }}
+  csi:
+    {{ .Values.filestore.csi | toYaml | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.filestore.mountOptions }}
+  mountOptions:
+    {{ .Values.filestore.mountOptions | toYaml | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.filestore.nfs }}
+  nfs:
+    {{ .Values.filestore.nfs | toYaml | indent 4 | trim }}
+  {{- end }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .Values.filestore.pvNameToCreate }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.filestore.storageClass | toYaml }}
+  volumeName: {{ .Values.filestore.pvNameToCreate }}
+  resources:
+    requests:
+      storage: {{ .Values.filestore.size }}
+{{- end}}

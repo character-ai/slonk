@@ -1,0 +1,277 @@
+namespace: slurm
+clusterName: slurm
+
+image: gcr.io/your-org/slonk:latest  # TODO: Replace with your container registry
+imagePullSecrets:
+  - name: k8s-external-secrets-gcr-io
+
+# Stable IP address for the login node
+# loginClusterIP: 10.96.4.4
+loginClusterIP: ""  # TODO: Replace with your cluster IP
+
+# Deploy a custom kube-dns with tolerations to run on TPU nodes
+customKubeDNS:
+  enabled: true
+  replicas: 3
+  tolerations:
+    - key: google.com/tpu
+      operator: Exists
+      effect: NoSchedule
+
+# Location of the shared Filestore for home directories
+filestore: {}
+## Example config: (real config set via values-override in cluster-addons/common/slonk)
+#  region: us-central2
+#  name: your-k8s-tpu1-filestore
+#  pvNameToCreate: filestore-home
+#  shareName: home
+#  ip: 172.20.144.2  # TODO: Replace with your filestore IP
+#  storageClass: enterprise-rwx
+#  size: 10Ti
+
+# Cloudflare configuration for SSH to the login node
+cloudflare:
+  enabled: true
+  externalSecretStore: your-external-secret-store  # TODO: Replace with your secret store
+  tunnelExternalSecretName: your-cloudflare-tunnel-secret  # TODO: Replace with your tunnel secret
+  shortLivedCertExternalSecretName: your-cloudflare-cert-secret  # TODO: Replace with your cert secret
+
+# External secret names for common secrets
+secrets:
+  externalSecretStore: your-external-secret-store  # TODO: Replace with your secret store
+  crowdstrikeCredsExternalSecretName: your-crowdstrike-creds-secret  # TODO: Replace with your Crowdstrike credentials secret
+  idRsaClusterExternalSecretName: your-ssh-keys-secret  # TODO: Replace with your SSH keys secret
+  ldapClientCredsExternalSecretName: your-ldap-client-creds-secret  # TODO: Replace with your LDAP credentials secret
+  mungeKeyExternalSecretName: your-munge-key-secret  # TODO: Replace with your Munge key secret
+  yubikeyPamExternalSecretName: your-yubikey-pam-secret  # TODO: Replace with your YubiKey PAM secret
+
+# LDAP configuration
+ldap:
+  uri: "ldaps://your-ldap-server.com"  # TODO: Replace with your LDAP server
+  userBase: "ou=Users,dc=yourcompany,dc=com"  # TODO: Replace with your LDAP user base
+  userFilter: "memberOf=cn=engineering,ou=Groups,dc=yourcompany,dc=com"  # TODO: Replace with your LDAP user filter
+  groupBase: "dc=yourcompany,dc=com"  # TODO: Replace with your LDAP group base
+  # list of groups to sync to the cluster
+  # this filter also creates a private group for each user
+  groupFilter: "|(cn=engineering)(cn=security)(cn=developers)(memberOf=cn=engineering,ou=Groups,dc=yourcompany,dc=com)"  # TODO: Replace with your LDAP group filter
+  # a group ID that is common to all users
+  commonGid: "1000"  # TODO: Replace with your common group ID
+
+# 2FA configuration
+yubikey:
+  enabled: false
+  requiredForSSH: true
+  requiredForSudo: true
+
+# Repositories to sync to the cluster
+gitSyncRepos:
+  - name: k8s
+    externalSecretName: your-git-creds-secret  # TODO: Replace with your Git credentials secret
+    repo: git@github.com:your-org/your-k8s-repo.git  # TODO: Replace with your Git repository
+    branch: main
+    destination: /home/common/git-sync/k8s
+    wait: 30
+    timeout: 600
+
+# Path to common folder on shared filesystem
+commonDir: /home/common  # NOTE: don't change this! search common in configmaps.yaml of slurm. It is hard coded now.
+# Path to scripts folder in mounted git-sync repos.
+scriptsDir: /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts
+configMapExeDir: /etc/slurm-cm-exe
+
+# Slurm configuration
+slurm:
+  Prolog: "{{ .Values.scriptsDir }}/slurm/prolog.sh"
+  TaskProlog: "{{ .Values.scriptsDir }}/slurm/task_prolog.sh"
+  Epilog: "{{ .Values.scriptsDir }}/slurm/epilog.sh"
+  TaskEpilog: "{{ .Values.scriptsDir }}/slurm/task_epilog.sh"
+
+nodepools:
+  controller:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 8
+        memory: 32Gi
+    tailFiles:
+      - /var/log/slurm/jobcomp.log
+      - /var/log/slurm/slurmctld.log
+      - /var/log/slurm/slurmdbd.log
+    startupCommand: |
+      source /etc/slurm-cm/setup-controller-node.sh
+    livenessProbe:
+      exec:
+        command: ["/bin/bash", "/etc/slurm-cm/controller-liveness.sh"]
+      failureThreshold: 5
+      periodSeconds: 30
+    tolerations:
+      - key: slurm-controller
+        operator: Exists
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: cloud.google.com/gke-nodepool
+              operator: In
+              values: ["slurm-controller"]
+    ports:
+      - containerPort: 6817
+        name: slurmctld
+      - containerPort: 6819
+        name: slurmdbd
+      - containerPort: 8071
+        name: metrics
+    volumeClaimTemplates:
+      - metadata:
+          name: slurm-controller-pvc
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: "premium-rwo"
+          resources:
+            requests:
+              storage: 100Gi
+    volumeMounts:
+      - name: slurm-controller-pvc
+        mountPath: /mnt/localdisk
+
+  login:
+    isLoginNode: true
+    installCrowdstrikeSensor: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 62
+        memory: 220Gi
+    startupCommand: |
+      source /etc/slurm-cm/setup-login-node.sh
+    tolerations:
+      - key: slurm-login
+        operator: Exists
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: cloud.google.com/gke-nodepool
+              operator: In
+              # slurm-login2 is a node pool with larger memory.
+              values: ["slurm-login", "slurm-login2"]
+    ports:
+    - name: mosh
+      containerPort: 60001
+
+  cpu:
+    isSlurmComputeNode: true
+    replicas: 0
+    slurmConfig:
+      CPUs: 16
+      RealMemory: 65536
+      Features: ["cpu"]
+    resources:
+      limits:
+        cpu: 16
+        memory: 64Gi
+    tailFiles:
+      - /var/log/slurm/slurmd.log
+      - /var/log/syslog
+    startupCommand: |
+      source /etc/slurm-cm/setup-compute-node.sh
+
+# template for TPU nodes (except name, replicas and nodeSelector)
+tpuCommonNodeTemplate:
+  # name: <filled in by tpuNodepools>
+  # replicas: <filled in by tpuNodepools>
+  # nodeSelector:
+  #  cloud.google.com/gke-nodepool: <filled in by tpuNodepools>
+  #  (...)
+  isSlurmComputeNode: true
+  hostPid: false
+  slurmConfig:
+    CPUs: 128
+    RealMemory: 262144
+  resources:
+    requests:
+      # TPU nodes have 240 CPU cores and 420GB of memory; leave some room for
+      # other pods on these nodes.
+      cpu: 192
+      memory: 256Gi
+    limits:
+      google.com/tpu: 4
+  tailFiles:
+    - /var/log/slurm/slurmd.log
+    - /var/log/syslog
+    - /tmp/tpu_logs/tpu_driver.ERROR
+    - /tmp/tpu_logs/tpu_driver.INFO
+    - /tmp/tpu_logs/tpu_driver.WARNING
+    - /tmp/megascale/*
+    - /tmp/ray/session_latest/logs/*
+  startupCommand: |
+    source /etc/slurm-cm/setup-tpu-node.sh
+  ports:
+    - containerPort: 8471  # Default port using which TPU VMs communicate
+      hostPort: 8471
+      name: tpu
+    - containerPort: 8071
+      hostPort: 8071
+      name: metrics
+    - containerPort: 8080
+      hostPort: 8080
+      name: tpu2
+    - containerPort: 6379  # port used by ray
+      hostPort: 6379
+      name: ray
+    - containerPort: 9090  # port used by reverb
+      hostPort: 9090
+      name: reverb
+# VOLUMES COMMENTED OUT FOR NOT WORKING TOO WELL ON RESTARTS
+# volumeClaimTemplates:
+#   - metadata:
+#       name: slurm-node-pvc
+#     spec:
+#       accessModes: [ "ReadWriteOnce" ]
+#       storageClassName: "local-path"
+#       resources:
+#         requests:
+#           storage: 60Gi
+# persistentVolumeClaimRetentionPolicy:
+#   whenDeleted: Delete
+# volumeMounts:
+#   - name: slurm-node-pvc
+#     mountPath: /mnt/localdisk
+tpuConfigs: {}
+## Example config: (real config set via values-override in cluster-addons/misc/tpu1-slurm/)
+#  v4-8:
+#    podType: tpu-v4-podslice
+#    numSlices: 16
+#    sliceType: v4-8
+#    replicasPerSlice: 1
+#    topology: 2x2x1
+#  v4-16:
+#    podType: tpu-v4-podslice
+#    numSlices: 8
+#    sliceType: v4-16
+#    replicasPerSlice: 2
+#    topology: 2x2x2
+#  v4-32:
+#    podType: tpu-v4-podslice
+#    numSlices: 4
+#    sliceType: v4-32
+#    replicasPerSlice: 4
+#    topology: 2x2x4
+#  4-64:
+#    podType: tpu-v4-podslice
+#    numSlices: 2
+#    sliceType: v4-64
+#    replicasPerSlice: 8
+#    topology: 2x4x4
+#  v4-256:
+#    podType: tpu-v4-podslice
+#    numSlices: 29
+#    sliceType: v4-256
+#    replicasPerSlice: 32
+#    topology: 4x4x8

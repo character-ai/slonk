@@ -1,0 +1,186 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+h1 {
+    color: #333;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 4px;
+    text-align: left;
+    vertical-align: top;
+    width: fit-content;
+    word-wrap: break-word;
+    white-space: normal;
+    overflow: auto;
+}
+
+th {
+    background-color: #4CAF50;
+    color: white;
+}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+tr:hover {
+    background-color: #ddd;
+}
+
+/* Specific column widths */
+table tr td:nth-child(1), table tr th:nth-child(1) { max-width: 150px; }
+table tr td:nth-child(2), table tr th:nth-child(2) { max-width: 150px; }
+table tr td:nth-child(3), table tr th:nth-child(3) { max-width: 250px; }
+table tr td:nth-child(4), table tr th:nth-child(4) { max-width: 800px; }
+
+.link-row {
+    background-color: #ddd;
+    text-align: center;
+}
+
+.link-row td {
+    border: none;
+}
+
+a {
+    text-decoration: none;
+    color: #007BFF;
+}
+
+/* Styled "nodes" link */
+#links {
+    margin-bottom: 20px;
+}
+
+#links a {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+#links a:hover {
+    background-color: #45a049;
+}
+
+#userNameNav {
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+#userNameNav button {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#userNameNav button:hover {
+    background-color: #45a049;
+}
+
+.collapsible {
+    cursor: pointer;
+}
+
+.collapsible.closed::after {
+    content: ' (Click to expand)';
+    color: #555;
+    font-style: italic;
+}
+
+.collapsible.open::after {
+    color: #555;
+    font-style: italic;
+}
+
+#pagination {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#pagination button {
+    padding: 5px 15px;
+    margin: 5px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+#pagination button:disabled {
+    background-color: #ccc;
+}
+
+.node-list {
+    font-size: 0.9em;
+}
+
+.node-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 3px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #eee;
+}
+
+.node-name {
+    flex: 0 0 auto;
+    font-family: monospace;
+    width: 110px;
+    margin-right: 10px;
+}
+
+.node-physical-name {
+    flex: 0 0 auto;
+    font-family: monospace;
+    color: #666;
+}
+
+.separator {
+    margin: 0 10px;
+    color: #999;
+}
+
+.rank-container {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.rank-link {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    margin: 0 1px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    text-decoration: none;
+    color: #333;
+    font-size: 0.8em;
+}
+
+.rank-link:hover {
+    background-color: #e0e0e0;
+}

@@ -1,0 +1,12 @@
+apiVersion: slonk.your-org.com/v1  # TODO: Replace with your organization domain
+kind: PhysicalNode
+metadata:
+  labels:
+    app.kubernetes.io/name: physicalnode
+    app.kubernetes.io/instance: physicalnode-sample
+    app.kubernetes.io/part-of: slonklet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: slonklet
+  name: physicalnode-sample
+spec:
+  # TODO(user): Add fields here

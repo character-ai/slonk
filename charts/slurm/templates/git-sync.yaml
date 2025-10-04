@@ -1,0 +1,83 @@
+{{- range .Values.gitSyncRepos }}
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: git-creds-{{ .name }}
+spec:
+  refreshInterval: 1h  # how often to refresh the secret from GCP
+  target:
+    # secret name to create in k8s
+    name: git-creds-{{ .name }}
+    creationPolicy: Owner
+  secretStoreRef:
+    # credentials for reading the secret from GCP
+    kind: ClusterSecretStore
+    name: {{ $.Values.secrets.externalSecretStore }}
+  dataFrom:
+  - extract:
+      key: {{ .externalSecretName }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-sync-{{ .name }}
+spec:
+  selector:
+    matchLabels:
+      app: git-sync-{{ .name }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: git-sync-{{ .name }}
+    spec:
+      {{- if $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{ $.Values.imagePullSecrets | toYaml | indent 8 | trim }}
+      {{- end }}
+      containers:
+        - name: git-sync-{{ .name }}
+          image: registry.k8s.io/git-sync/git-sync:v3.6.6
+          args:
+            - -ssh
+            - -repo={{ .repo }}
+            - -branch={{ .branch }}
+            - -depth=1
+            - -root={{ .destination }}
+            - -wait={{ .wait }}
+            - -timeout={{ .timeout }}
+            - -max-sync-failures=5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            {{- if eq $.Values.clusterName "your-cluster-name" }}
+            - name: netapp-home
+              mountPath: /home
+            {{- else }}
+            - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+              mountPath: /home
+            {{ end }}
+            - name: git-creds-volume
+              mountPath: /etc/git-secret
+      volumes:
+        {{- if eq $.Values.clusterName "your-cluster-name" }}
+        - name: netapp-home
+          persistentVolumeClaim:
+            claimName: netapp-home-pvc
+        {{- else }}
+        - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+          {{- if $.Values.filestore.hostPath }}
+          hostPath:
+            path: {{ $.Values.filestore.hostPath }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ $.Values.filestore.pvNameToCreate }}
+          {{ end }}
+        {{ end }}
+        - name: git-creds-volume
+          secret:
+            secretName: git-creds-{{ .name }}
+{{- end }}

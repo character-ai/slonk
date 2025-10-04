@@ -1,0 +1,376 @@
+{
+    "121703": {
+      "kind": "SlurmJob",
+      "apiVersion": "slonk.your-org.com/v1",
+      "metadata": {
+        "name": "121703",
+        "namespace": "slurm",
+        "uid": "c8978f97-009e-4752-b054-d755d5c79370",
+        "resourceVersion": "2575487418",
+        "generation": 1,
+        "creationTimestamp": "2024-05-16T00:55:20Z",
+        "managedFields": [
+          {
+            "manager": "slonklet-controller",
+            "operation": "Update",
+            "apiVersion": "slonk.your-org.com/v1",
+            "time": "2024-05-16T00:55:20Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {
+                ".": {
+  
+                },
+                "f:comment": {
+  
+                },
+                "f:userName": {
+  
+                }
+              }
+            }
+          },
+          {
+            "manager": "slonklet-controller",
+            "operation": "Update",
+            "apiVersion": "slonk.your-org.com/v1",
+            "time": "2024-06-23T22:52:10Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {
+  
+                },
+                "f:slurmJobRunCurrentStatus": {
+                  ".": {
+  
+                  },
+                  "f:runID": {
+  
+                  },
+                  "f:state": {
+  
+                  },
+                  "f:timestamp": {
+  
+                  }
+                },
+                "f:slurmJobRunStatusHistory": {
+  
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "userName": "user1",
+        "comment": "dev machine for user1"
+      },
+      "status": {
+        "slurmJobRunCurrentStatus": {
+          "runID": 4,
+          "state": "PENDING",
+          "timestamp": "2024-06-23T22:52:10Z"
+        },
+        "slurmJobRunStatusHistory": [
+          {
+            "runID": 3,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-11-63": {
+                "physicalNodeName": "57ebaf89cef2dc353760aa0063fdc1137467465a17c3c58775dd25e29ffbed71",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-12-9a64b106-4gv2",
+                "slurmNodeName": "cluster-h100-11-63"
+              }
+            },
+            "timestamp": "2024-06-12T21:33:57Z"
+          },
+          {
+            "runID": 3,
+            "state": "PENDING",
+            "timestamp": "2024-06-05T15:45:19Z"
+          },
+          {
+            "runID": 2,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-62": {
+                "physicalNodeName": "UNKNOWN",
+                "k8sNodeName": "UNKNOWN",
+                "slurmNodeName": "cluster-h100-5-62"
+              }
+            },
+            "timestamp": "2024-06-05T15:40:20Z"
+          },
+          {
+            "runID": 2,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-62": {
+                "physicalNodeName": "63bad5ce007ec6e23b1a695d0311c9315402f6c7788547d89f996fddefee11fd",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-6-b620a00e-6qfj",
+                "slurmNodeName": "cluster-h100-5-62"
+              }
+            },
+            "timestamp": "2024-06-05T06:54:44Z"
+          },
+          {
+            "runID": 2,
+            "state": "PENDING",
+            "timestamp": "2024-06-04T05:44:49Z"
+          },
+          {
+            "runID": 1,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-4": {
+                "physicalNodeName": "252aa760de4dc4de7ca6d9bc656bc235faa4ae1c9af7e34ddf279c3fcb77bde6",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-6-b620a00e-fv8w",
+                "slurmNodeName": "cluster-h100-5-4"
+              }
+            },
+            "timestamp": "2024-05-31T22:18:18Z"
+          },
+          {
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-48": {
+                "physicalNodeName": "989a11742b03f553aa617a3e16cd5273c682206abce0db98a64c74901f34b163",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-6-b620a00e-d799",
+                "slurmNodeName": "cluster-h100-5-48"
+              }
+            },
+            "timestamp": "2024-05-16T01:00:22Z"
+          },
+          {
+            "timestamp": null
+          }
+        ]
+      }
+    },
+    "125789": {
+      "kind": "SlurmJob",
+      "apiVersion": "slonk.your-org.com/v1",
+      "metadata": {
+        "name": "125789",
+        "namespace": "slurm",
+        "uid": "858e2300-81e2-45e2-b3a4-0cbed16d108d",
+        "resourceVersion": "2588047746",
+        "generation": 1,
+        "creationTimestamp": "2024-05-16T00:55:24Z",
+        "managedFields": [
+          {
+            "manager": "slonklet-controller",
+            "operation": "Update",
+            "apiVersion": "slonk.your-org.com/v1",
+            "time": "2024-05-16T00:55:24Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {
+                ".": {
+  
+                },
+                "f:comment": {
+  
+                },
+                "f:userName": {
+  
+                }
+              }
+            }
+          },
+          {
+            "manager": "slonklet-controller",
+            "operation": "Update",
+            "apiVersion": "slonk.your-org.com/v1",
+            "time": "2024-06-25T00:09:10Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {
+  
+                },
+                "f:slurmJobRunCurrentStatus": {
+                  ".": {
+  
+                  },
+                  "f:physicalNodeSnapshots": {
+                    ".": {
+  
+                    },
+                    "f:cluster-h100-7-74": {
+                      ".": {
+  
+                      },
+                      "f:k8sNodeName": {
+  
+                      },
+                      "f:physicalNodeName": {
+  
+                      },
+                      "f:slurmNodeName": {
+  
+                      }
+                    }
+                  },
+                  "f:runID": {
+  
+                  },
+                  "f:state": {
+  
+                  },
+                  "f:timestamp": {
+  
+                  }
+                },
+                "f:slurmJobRunStatusHistory": {
+  
+                }
+              }
+            },
+            "subresource": "status"
+          }
+        ]
+      },
+      "spec": {
+        "userName": "user2",
+        "comment": "dev machine for romal"
+      },
+      "status": {
+        "slurmJobRunCurrentStatus": {
+          "runID": 10,
+          "state": "RUNNING",
+          "physicalNodeSnapshots": {
+            "cluster-h100-7-74": {
+              "physicalNodeName": "931ac0392a217d9477f779ec891428e08d62eca6c7d4caea0dd6da04bd68e71d",
+              "k8sNodeName": "gke-example-k8s-cluster-h100-8-22f72d22-5p48",
+              "slurmNodeName": "cluster-h100-7-74"
+            }
+          },
+          "timestamp": "2024-06-25T00:09:10Z"
+        },
+        "slurmJobRunStatusHistory": [
+          {
+            "runID": 10,
+            "state": "PENDING",
+            "timestamp": "2024-06-25T00:04:08Z"
+          },
+          {
+            "runID": 9,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-10-68": {
+                "physicalNodeName": "afe0f8decaccb4f55680d7d07a0052cd3d108635589dbbd4760f70f0dc0a97ef",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-11-ce55ad0d-cwlp",
+                "slurmNodeName": "cluster-h100-10-68"
+              }
+            },
+            "timestamp": "2024-06-24T23:21:03Z"
+          },
+          {
+            "runID": 8,
+            "state": "PENDING",
+            "timestamp": "2024-06-24T23:16:03Z"
+          },
+          {
+            "runID": 7,
+            "state": "PENDING",
+            "timestamp": "2024-06-24T23:11:03Z"
+          },
+          {
+            "runID": 6,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-10-68": {
+                "physicalNodeName": "afe0f8decaccb4f55680d7d07a0052cd3d108635589dbbd4760f70f0dc0a97ef",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-11-ce55ad0d-cwlp",
+                "slurmNodeName": "cluster-h100-10-68"
+              }
+            },
+            "timestamp": "2024-06-09T16:24:27Z"
+          },
+          {
+            "runID": 5,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-7-45": {
+                "physicalNodeName": "32058bf55ed0f11ed5d59dd7cefbd3867244f601d6919b11d195c68f4c3f57c1",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-8-22f72d22-2szx",
+                "slurmNodeName": "cluster-h100-7-45"
+              }
+            },
+            "timestamp": "2024-06-07T23:02:26Z"
+          },
+          {
+            "runID": 5,
+            "state": "PENDING",
+            "timestamp": "2024-06-07T22:57:26Z"
+          },
+          {
+            "runID": 4,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-cpu16-0": {
+                "physicalNodeName": "UNKNOWN",
+                "k8sNodeName": "UNKNOWN",
+                "slurmNodeName": "cluster-cpu16-0"
+              }
+            },
+            "timestamp": "2024-06-06T05:04:50Z"
+          },
+          {
+            "runID": 3,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-cpu16-6": {
+                "physicalNodeName": "UNKNOWN",
+                "k8sNodeName": "UNKNOWN",
+                "slurmNodeName": "cluster-cpu16-6"
+              }
+            },
+            "timestamp": "2024-05-31T22:18:20Z"
+          },
+          {
+            "runID": 2,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-41": {
+                "physicalNodeName": "bcdff6feb1a22beea2735485c4b772ee480596b56de94f2fc8b0c06a1f67fd91",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-6-b620a00e-zqq5",
+                "slurmNodeName": "cluster-h100-5-41"
+              }
+            },
+            "timestamp": "2024-05-20T21:26:54Z"
+          },
+          {
+            "runID": 1,
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-5-2": {
+                "physicalNodeName": "b2b4040a2ae422f44bf7db2e7107573f8dd28ae5caefb524106a229b2400ed4f",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-6-b620a00e-rxdm",
+                "slurmNodeName": "cluster-h100-5-2"
+              }
+            },
+            "timestamp": "2024-05-20T21:11:54Z"
+          },
+          {
+            "state": "RUNNING",
+            "physicalNodeSnapshots": {
+              "cluster-h100-10-71": {
+                "physicalNodeName": "a1f5286a1cb068c627e87a8a2872af043223cfa7f80986af7d1c2c1ad62afc06",
+                "k8sNodeName": "gke-example-k8s-cluster-h100-11-ce55ad0d-7rzl",
+                "slurmNodeName": "cluster-h100-10-71"
+              }
+            },
+            "timestamp": "2024-05-16T01:00:21Z"
+          },
+          {
+            "timestamp": null
+          }
+        ]
+      }
+    }
+}

@@ -1,0 +1,539 @@
+# combine .Values.nodepools with the generated TPU nodepool configs
+# MUST STAY IN SYNC WITH services.yaml
+{{- $clusterName := .Values.clusterName }}
+{{- $nodepools := deepCopy .Values.nodepools }}
+
+{{- $tpuNodepools := include "slurm.tpuNodepools" (dict "configs" .Values.tpuConfigs "namespace" .Values.namespace "template" .Values.tpuCommonNodeTemplate) }}
+{{- $tpuNodepools2 := (get ($tpuNodepools | fromYaml) "output") }}
+{{- if $tpuNodepools2 }}
+{{- $nodepools = merge $nodepools $tpuNodepools2 }}
+{{- end }}
+
+{{- $gscNodepools := include "slurm.gscNodepools" (dict "configs" .Values.gscConfigs "namespace" .Values.namespace "template" .Values.gscCommonNodeTemplate) }}
+{{- $gscNodepools2 := (get ($gscNodepools | fromYaml) "output") }}
+{{- if $gscNodepools2 }}
+{{- $nodepools = merge $nodepools $gscNodepools2 }}
+{{- end }}
+
+# deploy statefulsets for each nodepool
+{{- range $name, $config := $nodepools }}
+{{- with $config }}
+{{- $name := printf "%s-%s" $clusterName $name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  replicas: {{ .replicas }}
+  # require manual deletion of Pods to update the StatefulSet
+  updateStrategy:
+    type: OnDelete
+    rollingUpdate: null
+  # launch/terminate pods in parallel (does not affect update operations)
+  podManagementPolicy: Parallel
+  serviceName: slurm-service
+  {{- if .volumeClaimTemplates }}
+  volumeClaimTemplates:
+    {{ .volumeClaimTemplates | toYaml | indent 4 | trim }}
+  {{- end }}
+  {{- if .persistentVolumeClaimRetentionPolicy }}
+  persistentVolumeClaimRetentionPolicy:
+    {{ .persistentVolumeClaimRetentionPolicy | toYaml | indent 4 | trim }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        {{- if .isSlurmComputeNode }}
+        slurm-compute: "yes"
+        {{- else }}
+        slurm-compute: "no"
+        {{- end }}
+        # Good for k exec/logs
+        kubectl.kubernetes.io/default-container: {{ $name }}
+      {{- if $.Values.annotations }}
+      annotations:
+        {{ $.Values.annotations | toYaml | indent 8 | trim }}
+      {{- end }}
+    spec:
+      {{- if $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{ $.Values.imagePullSecrets | toYaml | indent 8 | trim }}
+      {{- end }}
+
+      dnsConfig:
+        searches:
+          - {{ $.Values.namespace }}.svc.cluster.local
+      {{- if .useHostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      {{- else }}
+      dnsPolicy: ClusterFirst
+      {{- end }}
+      enableServiceLinks: false
+
+      # service account to allow pods to get node labels from the node they are
+      # running on, and to delete themselves as part of slurm's RebootProgram
+      serviceAccountName: slurm-{{ $.Values.namespace }}-sa
+
+      # amount of seconds to wait for the pod to terminate before killing it,
+      # including preStop hooks
+      terminationGracePeriodSeconds: 30
+
+      # use hostPIDs which helps with nvidia smi
+      hostPID: {{ .hostPID | default false }}
+
+      priorityClassName: slurm-prority
+
+      # change the file-watcher max-count on the login node to 524288
+      # run as an initContainer to avoid leaving privileged containers running
+      initContainers:
+        - name: node-setup-init
+          image: gcr.io/your-org/ubuntu:latest  # TODO: Replace with your container registry
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash","-c"]
+          args:
+            - |
+              set -vex
+              sysctl -w fs.inotify.max_user_watches=524288
+              sysctl -p
+              {{- if .scratchDir }}
+              # Wait for the existence of /mnt/localdisk/.initialized
+              while [ ! -f /mnt/localdisk/.initialized ]; do
+                echo "Waiting for /mnt/localdisk/.initialized to be created..."
+                sleep 5
+              done
+              echo "/mnt/localdisk/.initialized found, proceeding..."
+              {{- end }}
+          env:
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          {{- if .resources }}
+          resources:
+            {{ .resources | toYaml | indent 12 | trim }}
+          {{- end }}
+          volumeMounts:
+            {{- if .scratchDir }}
+            - name: scratchdir
+              mountPath: /mnt/localdisk
+              mountPropagation: HostToContainer
+            {{- end }}
+
+      containers:
+        - name: {{ $name }}
+          image: {{ default $.Values.image .image }}
+          imagePullPolicy: Always
+          command:
+            - /usr/bin/tini
+          args:
+            - -s
+            - -g
+            - --
+            - bash
+            - -c
+            - |
+              source /etc/slurm-cm/setup.sh
+              {{- if .startupCommand }}
+              {{ .startupCommand | indent 14 | trim }}
+              {{- end }}
+              {{- if .tailFiles }}
+              parallel --tagstring "{}:" --line-buffer tail -n 10000 -f --retry {} ::: {{ join " " .tailFiles }}
+              {{- else }}
+              sleep 1000000000
+              {{- end }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: K8S_HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: K8S_CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.cpu
+            - name: K8S_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: K8S_MEM_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.memory
+            - name: K8S_MEM_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: K8S_CLUSTER_NAME
+              value: {{ $clusterName }}
+            - name: K8S_CLUSTER
+              value: {{ $clusterName }}
+            {{- if and .isLoginNode $.Values.cloudflare.enabled }}
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-tunnel-secret
+                  key: token
+            {{- end }}
+            {{- if .installCrowdstrikeSensor }}
+            - name: FALCON_CID
+              valueFrom:
+                secretKeyRef:
+                  name: crowdstrike-creds
+                  key: FALCON_CID
+            - name: FALCON_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: crowdstrike-creds
+                  key: FALCON_CLIENT_ID
+            - name: FALCON_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: crowdstrike-creds
+                  key: FALCON_CLIENT_SECRET
+            {{- end }}
+            {{- if .installTcpX }}
+            - name: TCPX_VERSION
+              value: v3.1.9-2.19.4-12.0
+            {{- end }}
+
+          ports:
+            - containerPort: 7080
+              name: metrics-port
+            - containerPort: 22
+              name: ssh
+            {{- if .ports }}
+            {{ .ports | toYaml | indent 12 | trim }}
+            {{- end }}
+
+          # privileged containers are required for setting ulimits
+          {{- if .securityContext }}
+          securityContext:
+            {{ .securityContext | toYaml | indent 12 | trim }}
+          {{- else }}
+          securityContext:
+            privileged: true
+          {{- end }}
+
+          {{- if .resources }}
+          resources:
+            {{ .resources | toYaml | indent 12 | trim }}
+          {{- end }}
+
+          {{- if .isSlurmComputeNode }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - /bin/bash
+                - {{ $.Values.scriptsDir }}/k8s/prestop.sh
+          livenessProbe:
+            exec:
+              command: ["/bin/bash", "/etc/slurm-cm/healthz.sh"]
+            failureThreshold: 2
+            periodSeconds: 200
+          {{- end }}
+          {{- if .livenessProbe }}
+          livenessProbe:
+            {{ .livenessProbe | toYaml | indent 12 | trim}}
+          {{- end }}
+
+          volumeMounts:
+            {{- if and .isLoginNode $.Values.cloudflare.enabled }}
+            # cloudflare creds to support short-lived certificates
+            - name: cloudflare-short-lived-cert-volume
+              mountPath: /etc/ssh/ca.pub
+              subPath: ca.pub
+            {{- end }}
+            # crowdstrike creds
+            - name: crowdstrike-creds-volume
+              mountPath: /etc/crowdstrike-creds
+            # loads /home/common/profile.d/*.sh
+            - name: etc-profile-d-volume
+              mountPath: /etc/profile.d/common-profile-d.sh
+              subPath: common-profile-d.sh
+            # shared home directory
+            {{- if eq $clusterName "your-cluster-name" }}
+            # On this cluster mount filestore at /home-filestore
+            - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+              mountPath: /home-filestore
+            {{- else }}
+            - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+              mountPath: /home
+            {{- end }}
+            # support intra-cluster ssh
+            - name: id-rsa-cluster-volume
+              mountPath: /etc/id-rsa-cluster
+            # ldap config and creds
+            - name: ldap-client-creds-volume
+              mountPath: /var/ldap-client.crt
+              subPath: ldap-client.crt
+            - name: ldap-client-creds-volume
+              mountPath: /var/ldap-client.key
+              subPath: ldap-client.key
+            - name: ldap-client-creds-volume
+              mountPath: /var/ldap-bind-dn
+              subPath: ldap-bind-dn
+            - name: ldap-client-creds-volume
+              mountPath: /var/ldap-bind-password
+              subPath: ldap-bind-password
+            # munge key for slurm
+            - name: munge-key-volume
+              mountPath: /etc/munge-secret/munge.key
+              subPath: munge.key
+            # nsscache config
+            - name: nsscache-config-volume
+              mountPath: /etc/nsscache-config/nsscache.conf
+              subPath: nsscache.conf
+            - name: slurm-joblog
+              mountPath: /var/log/slurm-joblog
+            # /var/log on host
+            - name: hostlogs
+              mountPath: /var/log/hostlog
+            # increase shared memory
+            - name: dshm  # https://stackoverflow.com/a/46434614
+              mountPath: /dev/shm
+            # slurm config
+            - name: slurm-config-volume
+              mountPath: /etc/slurm-cm
+            - name: slurm-config-exe-volume
+              mountPath: /etc/slurm-cm-exe
+            {{- if and .installTcpX .isSlurmComputeNode }}
+            - name: tcpx-lib
+              mountPath: /var/lib/tcpx
+            - name: tcpx-socket
+              mountPath: /run/tcpx
+            {{- end }}
+            {{- if .scratchDir }}
+            - name: scratchdir
+              mountPath: /mnt/localdisk
+              mountPropagation: HostToContainer
+            {{- end }}
+            # yubikey pam config
+            - name: yubikey-pam-volume
+              mountPath: /etc/yubikey-pam
+            {{- if .volumeMounts }}
+            {{ .volumeMounts | toYaml | indent 12 | trim }}
+            {{- end }}
+        {{- if not .disableLoggingSidecar}}
+        - name: job-stdout
+          image: gcr.io/your-org/tayler:latest  # TODO: Replace with your logging container
+          args:
+            - "--monitor_dir"
+            - "/var/log/slurm-joblog"
+            - "--file_prefix"
+            - "stdout"
+          volumeMounts:
+          - name: slurm-joblog
+            mountPath: /var/log/slurm-joblog
+          # shared home directory, needed for some script
+          - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+            mountPath: /home
+        - name: job-stderr
+          image: gcr.io/your-org/tayler:latest  # TODO: Replace with your logging container
+          args:
+            - "--monitor_dir"
+            - "/var/log/slurm-joblog"
+            - "--file_prefix"
+            - "stderr"
+          volumeMounts:
+          - name: slurm-joblog
+            mountPath: /var/log/slurm-joblog
+          # shared home directory, needed for some script
+          - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+            mountPath: /home
+        - name: job-ledger
+          image: gcr.io/your-org/tayler:latest  # TODO: Replace with your logging container
+          args:
+            - "--monitor_dir"
+            - "/var/log/slurm-joblog"
+            - "--file_prefix"
+            - "ledger"
+          volumeMounts:
+          - name: slurm-joblog
+            mountPath: /var/log/slurm-joblog
+          # shared home directory, needed for some script
+          - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+            mountPath: /home
+        - name: job-nccl
+          image: gcr.io/your-org/tayler:latest  # TODO: Replace with your logging container
+          args:
+            - "--monitor_dir"
+            - "/var/log/slurm-joblog"
+            - "--file_prefix"
+            - "nccl"
+          volumeMounts:
+          - name: slurm-joblog
+            mountPath: /var/log/slurm-joblog
+          # shared home directory, needed for some script
+          - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+            mountPath: /home
+        {{- end }}
+        {{- if and .installTcpX .isSlurmComputeNode }}
+        - name: tcpx-daemon
+          image: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd-dev:v2.0.12
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # SIGTERM handler
+              graceful_shutdown() {
+                echo "SIGTERM signal received, shutting down tcpgpudmarxd..."
+                # Send SIGTERM to tcpgpudmarxd to allow graceful shutdown
+                kill -TERM "$pid"
+                exit 0
+              }
+
+              # Trap the SIGTERM signal
+              trap 'graceful_shutdown' TERM
+
+              while true; do
+                echo "Starting TCPX"
+                /tcpgpudmarxd/build/app/tcpgpudmarxd \
+                --gpu_nic_preset a3vm \
+                --gpu_shmem_type fd \
+                --uds_path /run/tcpx \
+                --rx_pool_size "4294967296" \
+                --setup_param "--verbose 128 2 0" &
+                pid=$!
+
+                wait $pid
+                exit_status=$?
+                [ $exit_status -eq 143 ] && echo "Detected SIGTERM, exiting loop to shutdown" && break
+                if [ $exit_status -eq 130 ]; then
+                  echo "Detected SIGINT, restarting tcpgpudmarxd..."
+                else
+                  echo "tcpgpudmarxd exited unexpectedly with status $exit_status, restarting..."
+                fi
+              done
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              cpu: 16
+              memory: 16G
+          volumeMounts:
+            - name: vulkan-icd-mount
+              mountPath: /etc/vulkan/icd.d
+            - name: nvidia-install-dir-host
+              mountPath: /usr/local/nvidia
+            - name: nvidia-config
+              mountPath: /etc/nvidia
+            - name: tcpx-socket
+              mountPath: /run/tcpx
+          env:
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nvidia/lib64
+        {{- end }}
+
+      volumes:
+        {{- if and .isLoginNode $.Values.cloudflare.enabled }}
+        - name: cloudflare-short-lived-cert-volume
+          secret:
+            secretName: cloudflare-short-lived-cert-secret
+        {{- end }}
+        - name: crowdstrike-creds-volume
+          secret:
+            secretName: crowdstrike-creds
+        - name: dshm  # https://stackoverflow.com/a/46434614
+          emptyDir:
+            medium: Memory
+        - name: etc-profile-d-volume
+          configMap:
+            name: etc-profile-d
+        - name: {{ $.Values.filestore.pvNameToCreate }}-volume
+          {{- if $.Values.filestore.hostPath }}
+          hostPath:
+            path: {{ $.Values.filestore.hostPath }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ $.Values.filestore.pvNameToCreate }}
+          {{- end }}
+        {{- if .scratchDir }}
+        - name: scratchdir
+          hostPath:
+            path: {{ .scratchDir }}
+        {{- end }}
+        - name: slurm-joblog
+          emptyDir: {}
+        - name: hostlogs
+          hostPath:
+            path: /var/log
+        - name: id-rsa-cluster-volume
+          secret:
+            secretName: id-rsa-cluster
+        - name: ldap-client-creds-volume
+          secret:
+            secretName: ldap-client-creds
+        - name: munge-key-volume
+          secret:
+            secretName: munge-key
+        - name: nsscache-config-volume
+          configMap:
+            name: nsscache-config
+        - name: slurm-config-volume
+          configMap:
+            name: slurm-config
+        - name: slurm-config-exe-volume
+          configMap:
+            defaultMode: 0777
+            name: slurm-config-exe
+        {{- if and .installTcpX .isSlurmComputeNode }}
+        - name: tcpx-socket
+          hostPath:
+            path: /run/tcpx
+        - name: tcpx-lib
+          hostPath:
+            path: /var/lib/tcpx
+        - name: vulkan-icd-mount
+          hostPath:
+            path: /home/kubernetes/bin/nvidia/vulkan/icd.d
+        - name: nvidia-install-dir-host
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: nvidia-config
+          hostPath:
+            path: /etc/nvidia
+        {{- end }}
+        - name: yubikey-pam-volume
+          secret:
+            secretName: yubikey-pam
+        {{- if .volumes }}
+        {{ .volumes | toYaml | indent 8 | trim }}
+        {{- end }}
+
+      {{- if .affinity }}
+      affinity:
+        {{ .affinity | toYaml | indent 8 | trim }}
+      {{- end }}
+      {{- if .nodeSelector }}
+      nodeSelector:
+        {{ .nodeSelector | toYaml | indent 8 | trim }}
+      {{- end }}
+      {{- if .tolerations }}
+      tolerations:
+        {{ .tolerations | toYaml | indent 8 | trim }}
+      {{- end }}
+{{- end }}
+{{- end }}

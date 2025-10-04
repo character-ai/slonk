@@ -1,0 +1,81 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - physicalnodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - physicalnodes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - physicalnodes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - slurmjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - slurmjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - slonk.your-org.com  # TODO: Replace with your organization domain
+  resources:
+  - slurmjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: manager-role
+  namespace: slurm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch

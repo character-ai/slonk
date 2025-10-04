@@ -1,0 +1,156 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: slurm-nb0
+  namespace: argocd
+spec:
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    generators:
+  - git:
+      repoURL: git@github.com:your-org/your-k8s-repo.git  # TODO: Replace with your Git repository
+        revision: HEAD
+        files:
+          - path: "cluster-config/remote-nb0.json"
+      selector:
+        matchLabels:
+          slurm_enabled: "true"
+  template:
+    metadata:
+      name: "slurm-{{name}}"
+    spec:
+      destination:
+        namespace: slurm
+        server: "{{server}}"
+      project: default
+      source:
+        repoURL: git@github.com:your-org/your-k8s-repo.git  # TODO: Replace with your Git repository
+        targetRevision: HEAD
+        path: charts/slurm
+        plugin:
+          name: custom-helm-plugin
+          parameters:
+            - name: chart-dir
+              string: "."
+            - name: values-file
+              string: "values.yaml"
+            - name: values-override
+              string: |
+                namespace: slurm
+                clusterName: {{name}}
+                image: gcr.io/your-org/slonk-h100:latest  # TODO: Replace with your container registry
+                loginClusterIP: YOUR_CLUSTER_IP  # TODO: Replace with your cluster IP
+                customKubeDNS:
+                  enabled: false
+                cloudflare:
+                  enabled: true
+                  externalSecretStore: your-external-secret-store  # TODO: Replace with your secret store
+                  tunnelExternalSecretName: your-cloudflare-tunnel-secret  # TODO: Replace with your tunnel secret
+                  shortLivedCertExternalSecretName: your-cloudflare-cert-secret  # TODO: Replace with your cert secret
+                filestore:
+                  pvNameToCreate: nfs-home
+                  hostPath: /mnt/nfs/home # shared nfs storage for code env (10TB)
+                slurm:
+                  Prolog: "{{ .Values.configMapExeDir }}/pro_epi_log.sh"
+                  TaskProlog: "{{ .Values.configMapExeDir }}/pro_epi_log.sh"
+                  Epilog: "{{ .Values.configMapExeDir }}/pro_epi_log.sh"
+                  TaskEpilog: "{{ .Values.configMapExeDir }}/pro_epi_log.sh"
+                nodepools:
+                  login:
+                    resources:
+                      requests:
+                        cpu: 96
+                        memory: 64Gi
+                    tolerations:
+                      - key: nvidia.com/gpu
+                        operator: Exists
+                        effect: NoSchedule
+                      - key: sku
+                        operator: Equal
+                        value: gpu
+                        effect: NoSchedule
+                    volumes:
+                      - name: mnt-data
+                        hostPath:
+                          path: /mnt/data
+                    volumeMounts:
+                      - name: mnt-data
+                        mountPath: /data
+                  controller:
+                    resources:
+                      requests:
+                        cpu: 96
+                        memory: 64Gi
+                    tolerations:
+                      - key: nvidia.com/gpu
+                        operator: Exists
+                        effect: NoSchedule
+                      - key: sku
+                        operator: Equal
+                        value: gpu
+                        effect: NoSchedule
+                    volumeClaimTemplates: []
+                    volumes:
+                      - name: slurm-controller-pvc
+                        hostPath:
+                          # nfs path
+                          path: /mnt/nfs/slurm_controller
+                      - name: mnt-data
+                        hostPath:
+                          path: /mnt/data # shared filesystem for checkpinting (50TB)
+                    volumeMounts:
+                      - name: mnt-data
+                        mountPath: /data
+                      - name: slurm-controller-pvc
+                        mountPath: /mnt/localdisk # NOTE: this is just the path slurm controller looks for, it is not localdisk as the name suggests.
+                  h100:
+                    isSlurmComputeNode: true
+                    replicas: 0
+                    useHostNetwork: false
+                    hostPID: true
+                    slurmConfig:
+                      CPUs: 96
+                      RealMemory: "819200"
+                      Features: ["h100"]
+                      Gres: "gpu:8"
+                    resources:
+                      limits:
+                        # Node Capacity: 128
+                        cpu: 96
+                        # Node Capacity: 1.7TB
+                        memory: 1500Gi
+                        nvidia.com/gpu: 8
+                    tolerations:
+                      - key: nvidia.com/gpu
+                        operator: Exists
+                        effect: NoSchedule
+                      - key: sku
+                        operator: Equal
+                        value: gpu
+                        effect: NoSchedule
+                      - key: partition
+                        operator: Equal
+                        value: slurm
+                        effect: NoSchedule
+                    tailFiles:
+                      - /var/log/slurm/slurmd.log
+                      - /var/log/slurm/task_prolog.log
+                    volumes:
+                      - name: mnt-data
+                        hostPath:
+                          path: /mnt/data
+                      - name: localdisk
+                        emptyDir: {}
+                    volumeMounts:
+                      - name: mnt-data
+                        mountPath: /data
+                      - name: localdisk
+                        mountPath: /mnt/disks/local
+                    startupCommand: |
+                      source /etc/slurm-cm/setup-compute-node.sh
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: false
+        syncOptions:
+          - CreateNamespace=true

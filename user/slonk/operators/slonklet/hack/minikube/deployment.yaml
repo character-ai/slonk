@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slonklet-controller-deployment
+  namespace: slonklet
+  labels:
+    app: slonklet-controller-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slonklet-controller-app
+  template:
+    metadata:
+      labels:
+        app: slonklet-controller-app
+    spec:
+      serviceAccountName: slonklet-controller-manager 
+      volumes:
+      - name: shared-volume
+        emptyDir: {}
+      containers:
+      - name: slonklet-controller
+        image: slonklet-controller-image:latest
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /etc/slurm/slurmrestd
+      - name: test-slurmrestd
+        image: test-slurmrestd:latest
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /etc/slurm/slurmrestd
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: slurm-node-1
+  namespace: slurm
+spec:
+  containers:
+  - name: sleeper
+    image: alpine
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do sleep 60; done"]
+
+---
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: slurm-node-2
+  namespace: slurm
+spec:
+  containers:
+  - name: sleeper
+    image: alpine
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do sleep 60; done"]

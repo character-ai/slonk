@@ -1,0 +1,19 @@
+--- a/examples/authorized-keys-command.py
++++ b/examples/authorized-keys-command.py
+@@ -1,1 +1,1 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+--- a/nss_cache/sources/ldapsource.py
++++ b/nss_cache/sources/ldapsource.py
+@@ -720,7 +720,10 @@
+                 try:
+                     obj_ts = self.FromLdapToTimestamp(obj['modifyTimestamp'][0])
+                 except KeyError:
+-                    obj_ts = self.FromLdapToTimestamp(obj['modifyTimeStamp'][0])
++                    try:
++                        obj_ts = self.FromLdapToTimestamp(obj['modifyTimeStamp'][0])
++                    except KeyError:
++                        obj_ts = 0
+ 
+             if max_ts is None or obj_ts > max_ts:
+                 max_ts = obj_ts

@@ -1,0 +1,89 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          slurmrestd
+# Required-Start:    $remote_fs $syslog munge
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start daemon at boot time
+# Description:       Slurm REST API daemon
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+PIDFILE=/var/run/slurmrestd.pid
+WATCHDOG_PIDFILE=/var/run/slurmrestd_watchdog.pid
+SLURMRESTD_OPTIONS=$(grep SLURMRESTD_OPTIONS /etc/sysconfig/slurmrestd | cut -d'=' -f2-)
+
+start() {
+    log_daemon_msg "Starting slurm REST API daemon" "slurmrestd"
+    if [ -f /etc/slurm/slurm.conf ]; then
+        eval start-stop-daemon --start --background --quiet --make-pidfile --pidfile $PIDFILE --exec /usr/sbin/slurmrestd -- $SLURMRESTD_OPTIONS
+        log_end_msg $?
+        # Start the watchdog in the background
+        watchdog &
+        echo $! > $WATCHDOG_PIDFILE
+    else
+        log_failure_msg "failed to start slurmrestd"
+    fi
+}
+
+stop() {
+    log_daemon_msg "Stopping slurm REST API daemon" "slurmrestd"
+    # Kill the watchdog process
+    if [ -f $WATCHDOG_PIDFILE ]; then
+        kill $(cat $WATCHDOG_PIDFILE)
+        rm -f $WATCHDOG_PIDFILE
+    fi
+    start-stop-daemon --stop --quiet --pidfile $PIDFILE --retry TERM/30/KILL/5
+    log_end_msg $?
+}
+
+status() {
+    if [ -f $PIDFILE ]; then
+        pid=$(cat $PIDFILE)
+        if kill -0 $pid > /dev/null 2>&1; then
+            echo "slurmrestd is running with pid $pid"
+        else
+            echo "slurmrestd is not running"
+        fi
+    else
+        echo "slurmrestd is not running"
+    fi
+}
+
+# Disabled for now. When watchdog and slonklet-controller are querying slurmrestd at the same time, slurmrestd becomes unresponsive.
+watchdog() {
+    while true; do
+        sleep inf
+        local URL="http://localhost:8080/slurm/v0.0.39/nodes"
+        if ! curl --unix-socket /etc/slurm/slurmrestd/slurmrestd.sock --silent --fail --max-time 10 "$URL" > /dev/null; then
+            echo "slurmrestd is unresponsive, attempting restart..."
+            service slurmrestd restart
+        else
+            echo "slurmrestd is healthy"
+        fi
+    done
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Usage: /etc/init.d/slurmrestd {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

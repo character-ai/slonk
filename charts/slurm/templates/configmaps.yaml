@@ -1,0 +1,931 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-profile-d
+data:
+  common-profile-d.sh: |
+    if [ "$SHELL" != "/bin/sh" -a "$TERM" != "dumb" ]; then
+        for i in {{ .Values.scriptsDir }}/profile.d/*.sh ; do
+            if [ -r "$i" ]; then
+                if [ "${-#*i}" != "$-" ]; then
+                    . "$i"
+                else
+                    . "$i" >/dev/null
+                fi
+            fi
+        done
+        unset i
+    fi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nsscache-config
+data:
+  nsscache.conf: |
+    [DEFAULT]
+
+    # Default NSS data source module name
+    source = ldap
+
+    # Default NSS data cache module name; 'files' is compatible with the
+    # libnss-cache NSS module.  'nssdb' is deprecated, and should not be used for
+    # new installations.
+    cache = files
+
+    # NSS maps to be cached
+    maps = passwd, group, shadow, sshkey
+
+    # Directory to store our update/modify timestamps
+    timestamp_dir = /home/common/.ldap/timestamps
+
+    # Lockfile to use for update/repair operations
+    lockfile = /home/common/.ldap/lockfile
+
+    # Enable to connect to Active Directory. If enabled (set to 1),
+    # default Active Directory attributes will be used for mapping.
+    # Leave disabled if connecting to openldap.
+    ldap_ad = 0
+
+    # LDAP URI to query for NSS data
+    ldap_uri = {{ .Values.ldap.uri }}
+
+    # Base for LDAP searches
+    ldap_base = {{ .Values.ldap.userBase }}
+
+    # Default LDAP search filter for maps
+    ldap_filter = ({{ .Values.ldap.userFilter }})
+
+    # Default LDAP search scope
+    ldap_scope = subtree
+
+    # Default LDAP BIND DN, empty string is an anonymous bind
+    ldap_bind_dn = "REPLACEME-LDAP-BIND-DN"  # TODO: Replace with your LDAP bind DN
+
+    # Default LDAP password, empty DN and empty password is used for
+    # anonymous binds
+    ldap_bind_password = "REPLACEME-LDAP-BIND-PASSWORD"  # TODO: Replace with your LDAP bind password
+
+    # Default setting for requiring tls certificates, one of:
+    # never, hard, demand, allow, try
+    ldap_tls_require_cert = 'allow'
+
+    # If you wish to use mTLS, set these to the paths of the TLS certificate and key.
+    ldap_tls_certfile = '/var/ldap-client.crt'
+    ldap_tls_keyfile = '/var/ldap-client.key'
+
+    # Directory to store the plain text files
+    files_dir = /home/common/.ldap
+
+    # Suffix used on the files module database files
+    files_cache_filename_suffix = cache_raw
+
+    [group]
+
+    ldap_base = {{ .Values.ldap.groupBase }}
+    ldap_filter = ({{ .Values.ldap.groupFilter }})
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slurm-config
+data:
+  slurmdbd.conf: |
+    AuthType=auth/munge
+    DbdAddr={{ .Values.clusterName }}-controller-0
+    DbdHost={{ .Values.clusterName }}-controller-0
+    SlurmUser=slurm
+    DebugLevel=verbose
+    LogFile=/var/log/slurm/slurmdbd.log
+    PidFile=/var/run/slurmdbd.pid
+    StorageType=accounting_storage/mysql
+    StorageHost=127.0.0.1
+    StorageUser=root
+    StorageLoc=slurm_acct_db
+  slurm.conf: |
+    DebugFlags=NO_CONF_HASH
+    ClusterName=slonk
+    SlurmctldHost={{ .Values.clusterName }}-controller-0
+
+    # configuration for dynamic nodes
+    # https://slurm.schedmd.com/dynamic_nodes.html#config
+    CommunicationParameters=NoAddrCache
+    ReconfigFlags=KeepPowerSaveSettings
+    SlurmctldParameters=idle_on_node_suspend,cloud_dns
+    TreeWidth=65533
+
+    # ports and logfiles
+    SlurmctldDebug=info
+    SlurmctldLogFile=/var/log/slurm/slurmctld.log
+    SlurmctldPidFile=/var/run/slurmctld.pid
+    SlurmctldPort=6817
+    SlurmdLogFile=/var/log/slurm/slurmd.log
+    SlurmdPidFile=/var/run/slurmd.pid
+    SlurmdPort=6818
+    SlurmdSpoolDir=/var/spool/slurmd
+    SlurmUser=slurm
+    StateSaveLocation=/mnt/localdisk/slurmctld-state
+
+    # preemption and priorities
+    PriorityType=priority/multifactor
+    PriorityWeightPartition=1000
+    PriorityWeightFairshare=0
+    PriorityWeightAge=0
+    PriorityWeightJobSize=0
+    PriorityMaxAge=1-0
+    PriorityWeightQOS=0
+
+    # scheduler
+    SchedulerParameters=max_switch_wait=31536000,nohold_on_prolog_fail,bf_max_job_test=1000000,bf_continue,enable_user_top
+    SchedulerType=sched/backfill
+    SelectType=select/cons_tres
+    SelectTypeParameters=CR_CPU
+    # TODO
+    #TaskPlugin=task/cgroup,task/affinity
+    TaskPlugin=task/affinity
+
+    # preemption/requeuing
+    PreemptType=preempt/partition_prio
+    PreemptMode=REQUEUE
+    JobRequeue=1
+
+    # config for TPUs
+    {{- if .Values.tpuConfigs }}
+    GresTypes={{- template "slurm.tpuTypes" (dict "configs" .Values.tpuConfigs) }}
+    {{- else }}
+    GresTypes=gpu
+    {{- end }}
+    TopologyPlugin=topology/tree
+
+    # misc configuration
+    JobCompType=jobcomp/filetxt
+    JobCompLoc=/var/log/slurm/jobcomp.log
+    # 7 = designated user asking for requeue
+    # 6 = designated user asking for reqeuehold
+    # 134 = sigabrt
+    # 139 = sigsegv
+    # 138 = sigusr1
+    # 143 = sigterm, definitely don't requeue here
+    # 137 = sigkill, definitely don't requeue here
+    RequeueExit=7,134,138,139
+    RequeueExitHold=6  # requeue hold on user error? not sure if okay with keepalive
+    KillOnBadExit=1  # if any task fails, kill the job
+    KillWait=30
+    MpiDefault=none
+    # TODO
+    #ProctrackType=proctrack/cgroup
+    ProctrackType=proctrack/linuxproc
+    PropagateResourceLimits=NONE
+    RebootProgram={{ .Values.scriptsDir }}/slurm/restart_pod.sh
+    ReturnToService=2
+    SwitchType=switch/none
+    UnkillableStepProgram={{ .Values.scriptsDir }}/slurm/restart_pod.sh
+
+    # increase timeouts to stay cool under load
+    MessageTimeout=30
+    SlurmdTimeout=300
+    TCPTimeout=4
+
+    # job accounting
+    AccountingStoreFlags=job_comment
+    AccountingStorageType=accounting_storage/slurmdbd
+    AccountingStorageHost={{ .Values.clusterName }}-controller-0
+    AccountingStorageTRES=gres/gpu,cpu,mem,billing
+    JobAcctGatherType=jobacct_gather/linux
+    JobAcctGatherFrequency=30
+
+    # prolog/epilog
+    PrologFlags=Alloc,DeferBatch,ForceRequeueOnFail,Contain
+    PrologEpilogTimeout=120
+    Prolog={{ tpl .Values.slurm.Prolog . }}
+    TaskProlog={{ tpl .Values.slurm.TaskProlog . }}
+    Epilog={{ tpl .Values.slurm.Epilog . }}
+    TaskEpilog={{ tpl .Values.slurm.TaskEpilog . }}
+
+    # make all job ids at least 5 digits
+    FirstJobId=10000
+
+    # cpu nodes
+    {{- range $name, $config := .Values.nodepools }}
+    {{- if and $config.isSlurmComputeNode (gt (int $config.replicas) 0) }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    {{- if $config.slurmConfig.Gres }}
+    NodeName={{ $name }}-[0-{{ sub $config.replicas 1 }}] State=UNKNOWN Features={{ join "," (append (default (list) $config.slurmConfig.Features) $name) }} Gres={{ $config.slurmConfig.Gres }} CPUs={{ $config.slurmConfig.CPUs }} RealMemory={{ $config.slurmConfig.RealMemory }}
+    {{- else }}
+    NodeName={{ $name }}-[0-{{ sub $config.replicas 1 }}] State=UNKNOWN Features={{ join "," (append (default (list) $config.slurmConfig.Features) $name) }} CPUs={{ $config.slurmConfig.CPUs }} RealMemory={{ $config.slurmConfig.RealMemory }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    # tpu nodes
+    {{- range $name, $tpuConfig := .Values.tpuConfigs }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    {{- range $i, $e := until ($tpuConfig.numSlices | int) }}
+    NodeName={{ $name }}-{{ $i }}-[0-{{ sub $tpuConfig.replicasPerSlice 1 }}] State=UNKNOWN Features=tpu,{{ $name }}-{{ $i }},{{ $tpuConfig.sliceType }} Gres={{ $tpuConfig.sliceType }}:8 CPUs={{ $.Values.tpuCommonNodeTemplate.slurmConfig.CPUs }} RealMemory={{ $.Values.tpuCommonNodeTemplate.slurmConfig.RealMemory }}
+    {{- end }}
+    {{- end }}
+
+    # gsc nodes
+    {{- range $name, $gscConfig := .Values.gscConfigs }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    {{- range $i, $e := until ($gscConfig.numSlices | int) }}
+    NodeName={{ $name }}-{{ $i }}-[0-{{ sub $gscConfig.replicasPerSlice 1 }}] State=UNKNOWN Features=gpu,{{ join "," (append (default (list) $.Values.gscCommonNodeTemplate.slurmConfig.Features) (printf "%s-%d" $name $i)) }} Gres=gpu:8 CPUs={{ $.Values.gscCommonNodeTemplate.slurmConfig.CPUs }} RealMemory={{ $.Values.gscCommonNodeTemplate.slurmConfig.RealMemory }}
+    {{- end }}
+    {{- end }}
+
+    # partitions
+    # set MaxTime to 1 year to allow backfill scheduler to work properly
+    PartitionName=low Nodes=ALL Default=NO DefaultTime=365-00:00:00 MaxTime=UNLIMITED State=UP PriorityTier=1
+    PartitionName=general Nodes=ALL Default=YES DefaultTime=365-00:00:00 MaxTime=UNLIMITED State=UP PriorityTier=10
+    PartitionName=high Nodes=ALL Default=NO DefaultTime=365-00:00:00 MaxTime=UNLIMITED State=UP PriorityTier=100
+    PartitionName=dev Nodes=ALL Default=NO DefaultTime=365-00:00:00 MaxTime=UNLIMITED State=UP PriorityTier=1000
+    PartitionName=priority Nodes=ALL Default=NO DefaultTime=365-00:00:00 MaxTime=UNLIMITED State=UP PriorityTier=10000 Hidden=No
+
+    # cronjobs
+    ScronParameters=enable
+  topology.conf: |
+    {{- $switches := list }}
+
+    # cpu nodes
+    {{- range $name, $config := .Values.nodepools }}
+    {{- if and $config.isSlurmComputeNode (gt (int $config.replicas) 0) }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    SwitchName={{ $name }} Nodes={{ $name }}-[0-{{ sub $config.replicas 1 }}]
+    {{- $switches = append $switches $name }}
+    {{- end }}
+    {{- end }}
+
+    # tpu nodes
+    {{- range $name, $config := .Values.tpuConfigs }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    {{- range $i, $e := until (.numSlices | int) }}
+    SwitchName={{ $name }}-{{ $i }} Nodes={{ $name }}-{{ $i }}-[0-{{ sub $config.replicasPerSlice 1 }}]
+    {{- $switches = append $switches (printf "%s-%d" $name $i) }}
+    {{- end }}
+    {{- end }}
+
+    # gsc nodes
+    {{- range $name, $config := .Values.gscConfigs }}
+    {{- $name := printf "%s-%s" $.Values.clusterName $name }}
+    {{- range $i, $e := until (.numSlices | int) }}
+    SwitchName={{ $name }}-{{ $i }} Nodes={{ $name }}-{{ $i }}-[0-{{ sub $config.replicasPerSlice 1 }}]
+    {{- $switches = append $switches (printf "%s-%d" $name $i) }}
+    {{- end }}
+    {{- end }}
+
+    # root switch
+    SwitchName=root Switches={{ join "," $switches }}
+  cgroup.conf: |
+    # TODO
+    #CgroupPlugin=cgroup/v2
+    CgroupPlugin=cgroup/v1
+    CgroupAutomount=yes
+    ConstrainCores=yes
+    ConstrainDevices=yes
+    ConstrainRamSpace=no
+    ConstrainSwapSpace=no
+  controller-liveness.sh: |
+    true
+    # timeout 30 sinfo
+  healthz.sh: |
+    #!/bin/bash
+    pgrep slurmd
+  setup.sh: |
+    #!/bin/bash
+    set -ex
+
+    # something weird in some of our images, have uid 1000 instead of root
+    chown root:root /usr/*
+
+    # start syslog tracking
+    rsyslogd
+
+    # export any K8S_ env variables to profile.d so they are copied for each user
+    echo "#!/bin/bash" > /etc/profile.d/k8s_env.sh
+    export | sed "s/declare -x /export /" | grep K8S_ >> /etc/profile.d/k8s_env.sh
+    chmod +x /etc/profile.d/k8s_env.sh
+
+    pip install -r /home/common/git-sync/k8s/k8s.git/user/slonk/requirements.txt
+    mkdir /build/slonk
+    chmod a+rx /build /build/slonk
+    ln -s /home/common/git-sync/k8s/k8s.git/user/slonk/* /build/slonk/
+    cd /build/slonk
+    pip install .
+    cd -
+
+    slonk env > /etc/environment.d/70-slonk.conf
+
+    # make sure zsh users get the same treatment
+    echo "source /etc/profile" >> /etc/zsh/zprofile
+
+    # always prefer ipv6
+    echo "precedence ::ffff:0:0/96 100" >> /etc/gai.conf
+
+    # setup slurm configuration with symlinks so they auto-update
+    mkdir -p /etc/slurm
+    ln -s /etc/slurm-cm/cgroup.conf /etc/slurm/cgroup.conf
+    ln -s /etc/slurm-cm/slurm.conf /etc/slurm/slurm.conf
+    ln -s /etc/slurm-cm/topology.conf /etc/slurm/topology.conf
+    cp /etc/slurm-cm/slurmdbd.conf /etc/slurm/slurmdbd.conf  # cp because perms matter
+    ln -s /home/common /etc/slurm/common
+    mkdir -p /etc/slurm/slurmrestd
+    chown slurm:slurm /etc/slurm/slurmrestd
+
+    if [[ -e /dev/nvidia0 ]]
+    then
+      echo "Name=gpu Count=8 File=/dev/nvidia[0-7]" > /etc/slurm/gres.conf
+    else
+      echo "" > /etc/slurm/gres.conf
+    fi
+
+    # setup pyxis
+    ln -s /usr/local/share/pyxis/pyxis.conf /etc/slurm/plugstack.conf
+    mkdir /run/enroot
+    chmod 777 /run/enroot
+
+    # make slurm dirs
+    mkdir -p /var/log/slurm/
+    chown slurm:slurm /var/log/slurm
+    mkdir -p /var/spool/slurmctld
+    chown slurm:slurm /var/spool/slurmctld
+    mkdir -p /var/spool/slurmd
+    chown slurm:slurm /var/spool/slurmd
+
+    # start munge
+    echo 'OPTIONS="--force --verbose"' | sudo tee -a /etc/default/munge
+    cp /etc/munge-secret/munge.key /etc/munge/munge.key
+    chown munge:munge /etc/munge/munge.key
+    chmod 600 /etc/munge/munge.key
+    service munge start
+
+    for attempt in $(seq 5)
+    do
+      sleep 5
+      if [ -e /run/munge/munge.socket.2 ]
+      then
+        break
+      fi
+      killall munged
+      sleep 1
+      service munge start
+    done
+    if [ ! -e /run/munge/munge.socket.2 ]; then exit 1; fi
+
+    # increase memlock limits (required for TPUs, but set everywhere)
+    ulimit -l unlimited
+    # increase file limits
+    ulimit -n 524288
+    # no memory limits for processes
+    ulimit -m unlimited
+    # increase soft memlock limits (required for TCPX)
+    echo "* soft memlock unlimited" | tee -a /etc/security/limits.conf
+
+    # configure LDAP
+    cp /etc/nsscache-config/nsscache.conf /etc/nsscache.conf
+    sed -E -i "s/REPLACEME-LDAP-BIND-DN/$(cat /var/ldap-bind-dn)/g" /etc/nsscache.conf
+    sed -E -i "s/REPLACEME-LDAP-BIND-PASSWORD/$(cat /var/ldap-bind-password)/g" /etc/nsscache.conf
+    mkdir -p /home/common/.ldap/timestamps
+    ln -s /home/common/.ldap/*.cache /etc/
+    sed -E -i "s/passwd:         files systemd/passwd:         files systemd cache/g" /etc/nsswitch.conf
+    sed -E -i "s/group:          files systemd/group:          files systemd cache/g" /etc/nsswitch.conf
+    sed -E -i "s/shadow:         files/shadow:         files cache/g" /etc/nsswitch.conf
+    pam-auth-update --enable mkhomedir
+
+    # open ssh on multiple ports for host networking true
+    # leave open on 22 for the login node to work
+    (
+    echo "Port 22"
+    echo "Port 8022"
+    echo "AuthorizedKeysCommand /bin/bash {{ .Values.scriptsDir }}/k8s/sshkeys.sh %u"
+    echo "AuthorizedKeysCommandUser nobody"
+    echo "PrintLastLog no"
+    ) >> /etc/ssh/sshd_config.d/slonk.conf
+
+    {{- if .Values.yubikey.enabled }}
+      # [legacy] disable global password-less sudo in older images
+      sed -E -i "s/^%admins ALL=\(ALL\) NOPASSWD: ALL/#%admins ALL=(ALL) NOPASSWD: ALL/g" /etc/sudoers
+
+      # TODO make this less dynamic once it's rolled out everywhere
+      ln -s /etc/yubikey-pam/yubikey /etc/pam.d/yubikey
+
+      {{- if .Values.yubikey.requiredForSSH }}
+      (
+      echo "ChallengeResponseAuthentication yes"
+      echo "AuthenticationMethods publickey,keyboard-interactive"
+      ) >> /etc/ssh/sshd_config.d/yubikey.conf
+      sed -E -i "s/^@include common-auth/#@include common-auth\n@include yubikey/g" /etc/pam.d/sshd
+      {{- end }}
+
+      {{- if .Values.yubikey.requiredForSudo }}
+      sed -E -i "s/^@include common-auth/#@include common-auth\n@include yubikey/g" /etc/pam.d/sudo
+      {{- end }}
+    {{- else }}
+      # enable global password-less sudo
+      echo "%admins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    {{- end }}
+
+    # configure ssh for all users
+    (
+    echo "Host slurm-*"
+    echo "  IdentityFile /etc/id-rsa-cluster/id_rsa_cluster"
+    echo "  StrictHostKeyChecking no"
+    echo "  UserKnownHostsFile=/dev/null"
+    echo "  Port 8022"
+    echo "  loglevel quiet"  # silence ssh key warnings
+    echo ""
+    echo "Host ${K8S_CLUSTER}-*"
+    echo "  IdentityFile /etc/id-rsa-cluster/id_rsa_cluster"
+    echo "  StrictHostKeyChecking no"
+    echo "  UserKnownHostsFile=/dev/null"
+    echo "  Port 8022"
+    echo "  loglevel quiet"  # silence ssh key warnings
+    )  >> /etc/ssh/ssh_config.d/slonk.conf
+
+    {{- if .Values.cloudflare.enabled }}
+    # configure cloudflare short-lived certificates
+    sed -E -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes\nTrustedUserCAKeys \/etc\/ssh\/ca.pub/g' /etc/ssh/sshd_config
+    sed -E -i 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
+    {{- end }}
+
+    # copy intra-cluster SSH keys and fix permissions
+    ls /etc/id-rsa-cluster | while read FILE; do
+      cp /etc/id-rsa-cluster/$FILE /etc/ssh/$FILE
+      if [[ $FILE == *.pub ]]; then
+        chmod 644 /etc/ssh/$FILE
+      else
+        chmod 600 /etc/ssh/$FILE
+      fi
+    done
+
+    # configure intra-cluster SSH for root
+    mkdir -p /root/.ssh
+    cp /etc/id-rsa-cluster/id_rsa_cluster /root/.ssh/
+    cp /etc/id-rsa-cluster/id_rsa_cluster.pub /root/.ssh/
+    cat /root/.ssh/id_rsa_cluster.pub >> /root/.ssh/authorized_keys
+    chmod 700 /root/.ssh
+    chmod 600 /root/.ssh/id_rsa_cluster
+    chmod 600 /root/.ssh/id_rsa_cluster.pub
+    chmod 600 /root/.ssh/authorized_keys
+
+    # start ssh
+    service ssh start
+
+    # enable cron jobs
+    sed -i '/session    required     pam_loginuid.so/c\#session    required   pam_loginuid.so' /etc/pam.d/cron
+    service cron start
+
+    # totally unnecessary games
+    rm /etc/update-motd.d/*
+    ln -s {{ .Values.scriptsDir }}/k8s/motd.sh /etc/update-motd.d/00-slonk
+
+    # install crowdstrike falcon sensor
+    # if [ -n "$FALCON_CLIENT_ID" -a -n "$FALCON_CLIENT_SECRET" ]; then
+    #   curl -L https://raw.githubusercontent.com/crowdstrike/falcon-scripts/v1.1.6/bash/install/falcon-linux-install.sh | bash
+    # fi
+
+    # make k8s-host point to the underlying host IP
+    echo "$K8S_HOST_IP k8s-host" | tee -a /etc/hosts
+
+    # Annotate the k8s node with the GCP physical host if that metadata is available
+    PHYSICAL_HOST_RESPONSE=$(curl -s -w "%{http_code}" http://metadata.google.internal/computeMetadata/v1/instance/attributes/physical_host -H "Metadata-Flavor: Google" || true)
+    PHYSICAL_HOST_STATUS_CODE=${PHYSICAL_HOST_RESPONSE: -3}
+    PHYSICAL_HOST_VALUE=${PHYSICAL_HOST_RESPONSE%???}
+    PHYSICAL_HOST_VALUE_PARSED=${PHYSICAL_HOST_VALUE##*/}
+    if [[ -n $PHYSICAL_HOST_VALUE_PARSED && -n $K8S_NODE_NAME && $PHYSICAL_HOST_STATUS_CODE == 2* ]]; then
+      TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+      APISERVER=https://kubernetes.default.svc
+      ANNOTATION_KEY="slonk.your-org.com/physical-host"
+      ANNOTATION_VALUE="$PHYSICAL_HOST_VALUE_PARSED"
+      PATCH_DATA=$(jq -c . <<EOF
+    {
+      "metadata": {
+        "annotations": {
+          "$ANNOTATION_KEY": "$ANNOTATION_VALUE"
+        }
+      }
+    }
+    EOF
+    )
+      curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/merge-patch+json" \
+        -X PATCH \
+        --data "$PATCH_DATA" \
+        -o /dev/null -s -w "%{http_code}\n" \
+        $APISERVER/api/v1/nodes/$K8S_NODE_NAME
+      echo "Annotated the k8s node with the physical host: $PHYSICAL_HOST_VALUE_PARSED"
+    else
+      echo "No response for physical_host metadata attribute"
+    fi
+
+    # Annotate the k8s node with GPU UUIDs
+    if ! command -v nvidia-smi &> /dev/null; then
+      echo "nvidia-smi command could not be found. Please ensure NVIDIA drivers are installed."
+    else
+      GPU_UUIDS=$(nvidia-smi --query-gpu=uuid --format=csv,noheader 2>&1)
+      if [ $? -ne 0 ]; then
+        echo "Error querying GPU UUIDs: $GPU_UUIDS"
+      elif [ -z "$GPU_UUIDS" ]; then
+        echo "No GPU UUIDs found. Are there GPUs installed and detected?"
+      else
+        TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+        APISERVER=https://kubernetes.default.svc
+        GPU_INDEX=0
+        CONCATENATED_UUIDS=""
+        while IFS= read -r GPU_UUID; do
+          CONCATENATED_UUIDS+="${GPU_UUID}"
+          ANNOTATION_KEY="slonk.your-org.com/gpu-uuid-${GPU_INDEX}"
+          PATCH_DATA=$(jq -c . <<EOF
+    {
+      "metadata": {
+        "annotations": {
+          "$ANNOTATION_KEY": "$GPU_UUID"
+        }
+      }
+    }
+    EOF
+    )
+          GPU_INDEX=$((GPU_INDEX + 1))
+
+          curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/merge-patch+json" \
+            -X PATCH \
+            --data "$PATCH_DATA" \
+            -o /dev/null -s -w "%{http_code}\n" \
+            $APISERVER/api/v1/nodes/$K8S_NODE_NAME
+          echo "Annotated the k8s node with the GPU UUID: $GPU_UUID"
+        done < <(echo "$GPU_UUIDS")
+        if [ -n "$CONCATENATED_UUIDS" ]; then
+          GPU_UUID_HASH=$(echo -n "$CONCATENATED_UUIDS" | sha256sum | awk '{print $1}')
+          ANNOTATION_KEY="slonk.your-org.com/gpu-uuid-hash"
+          PATCH_DATA=$(jq -c . <<EOF
+    {
+      "metadata": {
+        "annotations": {
+          "$ANNOTATION_KEY": "$GPU_UUID_HASH"
+        }
+      }
+    }
+    EOF
+    )
+          curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/merge-patch+json" \
+            -X PATCH \
+            --data "$PATCH_DATA" \
+            -o /dev/null -s -w "%{http_code}\n" \
+            $APISERVER/api/v1/nodes/$K8S_NODE_NAME
+          echo "Annotated the k8s node with the GPU UUID hash: $GPU_UUID_HASH"
+        fi
+      fi
+    fi  
+  setup-compute-node.sh: |
+    #!/bin/bash
+    set -e
+
+    hostname $K8S_POD_NAME
+    # hostname -f
+    ldconfig
+    chmod a+r /etc/ld.so.cache
+
+    if [ "$K8S_CLUSTER_NAME" = "your-cluster-name" ]; then
+      # Create and mount /data directory, /data is zonal filestore.
+      mkdir -p /data
+      mount -o rw,intr,nolock YOUR_DATA_SERVER:/data /data  # TODO: Replace with your data mount IP
+    fi
+
+    # now kick off continuous checks in the background forever
+    # TODO: we need to move this into a k8s daemonset instead
+    # slonk --quiet health --mode continuous &
+
+    # install our crontab for worker nodes
+    ln -s /etc/slurm-cm/crontab-worker /etc/cron.d/crontab-worker
+
+    # deploy common conda envs on all machines
+    bash {{ .Values.scriptsDir }}/k8s/setup_env.sh
+
+    # used to collect node metrics
+    python {{ .Values.scriptsDir }}/k8s/jobmetrics.py > /dev/null 2>/dev/null &
+
+    # save slurmd options to sysconfig
+    mkdir -p /etc/sysconfig
+    cat <<EOM > /etc/sysconfig/slurmd
+    SLURMD_OPTIONS=-f /etc/slurm/slurm.conf -b -c
+    EOM
+
+    # make sure the local disk is world writeable
+    if [ -e /mnt/localdisk ]; then
+      chmod a+w /mnt/localdisk
+      rm -f /mnt/localdisk/.cleaning
+    fi
+
+    # register node with slurm
+    bash {{ .Values.scriptsDir }}/k8s/start_slurmd.sh
+  setup-controller-node.sh: |
+    #!/bin/bash
+    set -e
+
+    ulimit -c unlimited  # force core dumps
+    echo "PWD: $(pwd)"
+
+    # set permissions for home directory
+    chmod 777 /home
+    chgrp {{ .Values.ldap.commonGid }} /home
+    chmod g+s /home
+    mkdir -p /home/common
+    chmod 775 /home/common
+    chgrp {{ .Values.ldap.commonGid }} /home/common
+    chmod g+s /home/common
+    mkdir -p /home/common/git-sync
+    chmod 777 /home/common/git-sync
+
+    # schedule cron job to update LDAP cache
+    ln -s /etc/slurm-cm/crontab-controller /etc/cron.d/crontab-controller
+
+    # save slurmctld options to sysconfig
+    mkdir -p /etc/sysconfig
+    cat <<EOM > /etc/sysconfig/slurmctld
+    SLURMCTLD_OPTIONS=-f /etc/slurm/slurm.conf -v
+    EOM
+    # save slurmdbd options
+    cat <<EOM > /etc/sysconfig/slurmdbd
+    SLURMDBD_OPTIONS=
+    EOM
+    chmod 600 /etc/slurm/slurmdbd.conf
+    chown slurm:slurm /etc/slurm/slurmdbd.conf
+    # save slurmrestd options
+    cat <<EOM > /etc/sysconfig/slurmrestd
+    SLURMRESTD_OPTIONS=-v -u slurm -s dbv0.0.39,v0.0.39 unix:/etc/slurm/slurmrestd/slurmrestd.sock
+    EOM
+    # save slonklet-controller options.
+    cat <<EOM > /etc/sysconfig/slonklet-controller
+    {{ if eq $.Values.clusterName "your-cluster-name"}}
+    SLONKLET_CONTROLLER_OPTIONS=--identifier=gpu-uuid-hash --auto-remediate --log-path=/var/log/slurm/slonklet-controller.log
+    {{ else }}
+    SLONKLET_CONTROLLER_OPTIONS=--identifier=gpu-uuid-hash --log-path=/var/log/slurm/slonklet-controller.log
+    {{ end }}
+    EOM
+
+    # slurmctld setup
+    mkdir -p /mnt/localdisk/slurmctld-state
+    chown slurm:slurm /mnt/localdisk/slurmctld-state
+
+    # annoying mysql configuration stuff
+    if [ ! -d /mnt/localdisk/mysql ]; then
+        # initialize the db if we must
+        mkdir -p /mnt/localdisk/mysql
+        chown mysql:mysql /mnt/localdisk/mysql
+        mysqld --initialize-insecure --datadir /mnt/localdisk/mysql
+    fi
+    chown -R mysql:mysql /mnt/localdisk/mysql  # redundant but may be needed when upgrading images
+    chmod a+rx /var/run/mysqld
+    echo "datadir = /mnt/localdisk/mysql" >> /etc/mysql/mysql.conf.d/mysqld.cnf
+    echo "socket = /var/run/mysqld/mysqld.sock" >> /etc/mysql/mysql.conf.d/mysqld.cnf
+
+    # add delays between steps to ensure they have fully started up
+    service mysql start || { status=$?; echo "Mysql Log (exit $stauts):"; cat /var/log/mysql/*; exit $status; }
+    sleep 10
+    service slurmdbd start
+    sleep 10
+    service slurmctld start
+    sleep 10
+    service slurmrestd start
+    sleep 10
+    service slonklet-controller start
+
+    # start the metrics server
+    python {{ .Values.scriptsDir }}/k8s/prom.py &
+
+  setup-login-node.sh: |
+    #!/bin/bash
+    set -e
+
+    if [ "$K8S_CLUSTER_NAME" = "your-cluster-name" ]; then
+      # Create and mount /data directory, /data is zonal filestore.
+      mkdir -p /data
+      mount -o rw,intr,nolock YOUR_DATA_SERVER:/data /data  # TODO: Replace with your data mount IP
+    fi
+
+    {{- if .Values.cloudflare.enabled }}
+    # start ssh with cloudflare short-lived certificates
+    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    dpkg -i cloudflared.deb
+    rm cloudflared.deb
+    cloudflared service install $TUNNEL_TOKEN
+    {{- end }}
+
+    # start eternal terminal
+    sudo /usr/bin/etserver --cfgfile=/etc/et.cfg --logdir /var/log/et --daemon
+  setup-tpu-node.sh: |
+    #!/bin/bash
+    set -ex
+
+    # used to collect metrics
+    python {{ .Values.scriptsDir }}/k8s/prom.py &
+
+    # TPUs write logs to /tmp, set permissions appropriately
+    chgrp {{ .Values.ldap.commonGid }} /tmp
+    chmod g+s /tmp/
+    mkdir /tmp/tpu_logs
+    chmod 777 /tmp/tpu_logs
+
+    # GKE injects TPU-related env variables into the pod
+    # export these to profile.d so they are copied for each user
+    export | grep TPU_ > /etc/profile.d/tpu_env.sh
+    chmod +x /etc/profile.d/tpu_env.sh
+
+    # save slurmd options to sysconfig
+    mkdir -p /etc/sysconfig
+    cat <<EOM > /etc/sysconfig/slurmd
+    SLURMD_OPTIONS=-f /etc/slurm/slurm.conf -b -c
+    EOM
+
+    # not a real localdisk but prep it anyway for consistency across the fleet
+    mkdir -p /mnt/localdisk
+    chmod a+w /mnt/localdisk
+
+    # register node with slurm
+    bash {{ .Values.scriptsDir }}/k8s/start_slurmd.sh
+  crontab-controller: |
+    # cron jobs that run on controller
+    # sync ldap
+    */15 * * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/ldap_sync.py
+    # compute file storage, once a day
+    0 10 * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/diskusage.sh
+    # ephemeral cleanup, once an hour
+    30 * * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/ephemeral.sh
+    # restart slurmctld if slurm.conf changes
+    0  * * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/restart_controller.sh
+  crontab-worker: |
+    # cleans up everything in /mnt/localdisk/cache not used in >24h
+    */15 * * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/localdisk-cleanup.sh
+    # record nfs usage statistics to find bad actors
+    */5  * * * * root /home/common/git-sync/k8s/k8s.git/charts/slurm/scripts/k8s/nfs.sh
+    # enforce cpuset policy every minute
+    {{ if eq $.Values.clusterName "your-cluster-name"}}
+    * * * * * root /etc/slurm-cm-exe/set_cpuset.sh
+    {{ end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slurm-config-exe
+data:
+  pro_epi_log.sh: |
+    #!/bin/bash
+    source /etc/profile.d/k8s_env.sh
+    USER=root slonk prolog --mode $SLURM_SCRIPT_CONTEXT
+  logtee: |
+    #!/bin/bash
+    set -eo pipefail
+
+    ROOT=/var/log/slurm-joblog
+
+    function generate_fn() {
+        prefix=$1
+        shift
+        jobid=${SLURM_JOBID:-99999}
+        restartcount=${SLURM_RESTART_COUNT:-0}
+        rank=${SLURM_PROCID:-0}
+
+        echo "${ROOT}/${prefix}_job${jobid}_restart${restartcount}_rank${rank}.log"
+    }
+
+    function cleanup() {
+        rm -f "$PATH_ERR" "$PATH_OUT"
+        exit $1
+    }
+    trap 'cleanup $?' EXIT
+
+    PATH_ERR=$(generate_fn stderr)
+    PATH_OUT=$(generate_fn stdout)
+
+    command="$@"
+    $command 2> >(tee "$PATH_ERR" >&2) | tee "$PATH_OUT"
+  set_cpuset.sh: |
+    #!/bin/bash
+
+    # Allowed CPU list
+    #
+    # Polling thread cpus in nccl.py:
+    #
+    # "NCCL_GPUDIRECTTCPX_TX_BINDINGS": "eth1:8-21,112-125;eth2:8-21,112-125;eth3:60-73,164-177;eth4:60-73,164-177",
+    # "NCCL_GPUDIRECTTCPX_RX_BINDINGS": "eth1:22-35,126-139;eth2:22-35,126-139;eth3:74-87,178-191;eth4:74-87,178-191",
+    #
+    # CPU allocation example for large nodes (0-207 CPUs)
+    NON_SLURM_CPUS="36-59, 88-95, 104-111, 140-163, 192-207" # 80 CPUs for non slonk pod workload
+    TCPXDAEMON_CPU="0-7,96-103" # 16 CPUs for TCPX Daemon
+
+    # Function to write CPU list to cgroup
+    write_cpu_list() {
+      local cgroup_path=$1
+      local cpus=$2
+      if [ -d "$cgroup_path" ]; then
+        echo "$cpus" > "$cgroup_path/cpuset.cpus"
+      else
+        echo "Error: cgroup path $cgroup_path does not exist"
+      fi
+    }
+
+    # Function to discard the last segment of a path
+    discard_last_segment() {
+      local path=$1
+      echo "$path" | rev | cut -d'/' -f2- | rev
+    }
+
+    # 1. Cover all the best-effort pods
+    BESTEFFORT_PATH="/sys/fs/cgroup/kubepods.slice/kubepods-besteffort.slice"
+    write_cpu_list "$BESTEFFORT_PATH" "$NON_SLURM_CPUS"
+
+    # 2. Write to all siblings
+    BURSTABLE_PATH="/sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice"
+    SELF_CGROUP=$(awk -F':' '{print $3}' /proc/self/cgroup)
+    SELF_CGROUP=$(discard_last_segment "$SELF_CGROUP")
+    SELF_CGROUP_PATH="/sys/fs/cgroup$SELF_CGROUP"
+
+    for cgroup in "$BURSTABLE_PATH"/*; do
+      if [[ -d "$cgroup" && "$cgroup" != "$SELF_CGROUP_PATH" ]]; then
+        write_cpu_list "$cgroup" "$NON_SLURM_CPUS"
+      fi
+    done
+
+    # 3. Handle TCPX Daemon
+    TCPX_DAEMON_PID=$(pgrep tcpgpudmarxd)
+    if [ -n "$TCPX_DAEMON_PID" ]; then
+      TCPX_DAEMON_CGROUP=$(awk -F':' '{print $3}' /proc/$TCPX_DAEMON_PID/cgroup)
+      TCPX_DAEMON_CGROUP_PATH="/sys/fs/cgroup$TCPX_DAEMON_CGROUP"
+      write_cpu_list "$TCPX_DAEMON_CGROUP_PATH" "$TCPXDAEMON_CPU"
+    else
+      echo "tcpgpudmarxd not found!!"
+    fi
+
+    # 4. Write to guaranteed pods
+    GUARANTEED_PATH="/sys/fs/cgroup/kubepods.slice"
+    for cgroup in "$GUARANTEED_PATH"/kubepods-pod*; do
+      if [ -d "$cgroup" ]; then
+        write_cpu_list "$cgroup" "$NON_SLURM_CPUS"
+      fi
+    done
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slurmrestd-nginx
+data:
+  nginx.conf: |
+    user root;
+    worker_processes auto;
+    pid /run/nginx.pid;
+
+    events {
+        worker_connections 64;
+    }
+
+    http {
+      # Load the necessary modules for HTTP and MIME types
+      include       mime.types;
+      default_type  application/octet-stream;
+
+      # Logging settings
+      access_log    /var/log/nginx/access.log;
+      error_log     /var/log/nginx/error.log;
+
+      server {
+        listen 6820;   # default slurmrestd port
+
+        location / {
+          # Only allow GET requests, deny others
+          limit_except GET {
+              deny all;
+          }
+
+          # Proxy settings pointing to the UNIX socket
+          proxy_pass http://unix:/etc/slurm/slurmrestd/slurmrestd.sock:;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+      }
+
+      server {
+        listen 18080;
+
+        location /api/ {
+          proxy_pass http://localhost:8080/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection 'upgrade';
+          proxy_set_header Host $host;
+          proxy_cache_bypass $http_upgrade;
+        }
+
+        location / {
+          root /home/common/git-sync/k8s/k8s.git/user/slonk/static/;
+          try_files $uri $uri/ $uri.html =404;
+        }
+      }
+    }

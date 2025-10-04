@@ -1,0 +1,12 @@
+apiVersion: slonk.your-org.com/v1  # TODO: Replace with your organization domain
+kind: SlurmJob
+metadata:
+  labels:
+    app.kubernetes.io/name: slurmjob
+    app.kubernetes.io/instance: slurmjob-sample
+    app.kubernetes.io/part-of: slonklet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: slonklet
+  name: slurmjob-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Nodes</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .link-row {
+            background-color: #ddd;
+            text-align: center;
+        }
+        .link-row td {
+            border: none;
+        }
+        a {
+            text-decoration: none;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>Slonk Nodes</h1>
+    <div id="links">
+        <a href="/index.html">Running Jobs</a> 
+    </div>
+    <table id="nodesTable">
+        <thead>
+            <tr>
+                <th>Physical Node Name</th>
+                <th>Goal State</th>
+                <th>K8s Node Name</th>
+                <th>Slurm Node Name</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script src="nodes.js"></script>
+</body>
+</html>
