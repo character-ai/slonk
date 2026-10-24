@@ -159,7 +159,7 @@ func (r *PhysicalNodeReconciler) Sync(
 	// }
 
 	if _, err := r.PropogateSlurmGoalStateToK8sNodeTaints(ctx, slurmNodeMap, k8sNodeMap, existingPhysicalNodeMap); err != nil {
-		return nil, fmt.Errorf("propogate slurm goal state to k8s node taints: %w", err)
+		return nil, fmt.Errorf("propagate slurm goal state to k8s node taints: %w", err)
 	}
 
 	if autoRemediate {

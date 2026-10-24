@@ -31,8 +31,8 @@ func NewMultiStateStore(parentDir string, states []core.TaskState) (*MultiStateS
 		if err := os.MkdirAll(dir, 0775); err != nil {
 			return nil, fmt.Errorf("mkdir: %s", err)
 		}
-		interalState := base.NewFileState(dir)
-		stateMap[state] = &interalState
+		internalState := base.NewFileState(dir)
+		stateMap[state] = &internalState
 	}
 
 	return &MultiStateStore{store, stateMap}, nil
